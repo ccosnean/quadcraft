@@ -46,9 +46,9 @@ class PaintMove extends GameMove {
 
 /// One hand-authored puzzle.
 ///
-/// [solution] is the reference line the level was designed around: it defines
-/// [parMoves], drives the in-game hint, and is replayed by the level tests so a
-/// broken puzzle can never ship.
+/// [solution] is the reference line the level was designed around. It is kept
+/// for authoring and replayed by the level tests so a broken puzzle can never
+/// ship — it is not shown to players (scores stay open for friend challenges).
 @immutable
 class Level {
   const Level({

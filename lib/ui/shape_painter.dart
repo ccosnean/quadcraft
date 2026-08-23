@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -12,16 +11,24 @@ import 'theme.dart';
 /// All forms are authored once in a unit quadrant that occupies the +x/+y
 /// octant with an outer radius of 1, then reused by rotating the canvas. That
 /// keeps painting allocation-free on the hot path.
+///
+/// Every form meets the shared plate origin and the two radial axes, so four
+/// matching quarters combine into one continuous silhouette (disk, square,
+/// star, windmill) with only a thin outline between pieces.
 abstract final class ShapeGeometry {
-  /// Fraction of the radius kept clear along the quadrant seams.
-  static const double seam = 0.055;
-
-  /// Each stacked layer is drawn this much smaller than the one below it.
-  static const double layerFalloff = 0.72;
-
   /// Radius as a fraction of half the widget size. Leaves room for square and
   /// windmill quadrants, whose corners reach past the circle's radius.
   static const double radiusFactor = 0.70;
+
+  /// Each stacked layer is drawn this much smaller than the one below it.
+  /// Bottom (index 0) = outermost; top = innermost.
+  static const double layerFalloff = 0.72;
+
+  /// Outline width in unit space (path is scaled by piece radius).
+  static const double outlineWidth = 0.026;
+
+  /// Slight oversize so abutting fills hide the guide crosshair under AA.
+  static const double fillBleed = 1.01;
 
   static final Map<QuadForm, Path> _unit = {
     for (final form in QuadForm.values) form: _buildUnit(form),
@@ -31,21 +38,16 @@ abstract final class ShapeGeometry {
 
   /// Clockwise canvas rotation that moves the canonical quadrant into place.
   static double angleOf(Corner corner) => switch (corner) {
-        Corner.br => 0,
-        Corner.bl => math.pi / 2,
-        Corner.tl => math.pi,
-        Corner.tr => 3 * math.pi / 2,
-      };
+    Corner.br => 0,
+    Corner.bl => math.pi / 2,
+    Corner.tl => math.pi,
+    Corner.tr => 3 * math.pi / 2,
+  };
 
   static Path _buildUnit(QuadForm form) {
-    // Forms live in the +x/+y unit quadrant. Square/star/windmill are inset by
-    // [seam] on every edge so neighbours never touch. Circles are special: the
-    // arc must be centered on the shared plate origin (0,0) so four rotated
-    // quarters form one smooth ring — centering on the inset corner was the
-    // source of the faceted "weird lines" on the outer rim.
-    const span = 1 - seam;
-    Offset at(double u, double v) => Offset(seam + u * span, seam + v * span);
-
+    const seam = 0.02;
+    // Forms live in the +x/+y unit quadrant and meet the shared plate origin
+    // so four matching quarters combine into one continuous silhouette.
     switch (form) {
       case QuadForm.circle:
         // Quarter disk around the shared plate origin so four rotated copies
@@ -59,49 +61,27 @@ abstract final class ShapeGeometry {
           ..close();
       case QuadForm.square:
         return Path()
-          ..moveTo(at(0, 0).dx, at(0, 0).dy)
-          ..lineTo(at(1, 0).dx, at(1, 0).dy)
-          ..lineTo(at(1, 1).dx, at(1, 1).dy)
-          ..lineTo(at(0, 1).dx, at(0, 1).dy)
+          ..moveTo(0, 0)
+          ..lineTo(1, 0)
+          ..lineTo(1, 1)
+          ..lineTo(0, 1)
           ..close();
       case QuadForm.star:
+        // Shapez-style bite: outer arms on the axes, notch toward the rim.
         return Path()
-          ..moveTo(at(0, 0).dx, at(0, 0).dy)
-          ..lineTo(at(1, 0).dx, at(1, 0).dy)
-          ..lineTo(at(0.42, 0.42).dx, at(0.42, 0.42).dy)
-          ..lineTo(at(0, 1).dx, at(0, 1).dy)
+          ..moveTo(0, 0)
+          ..lineTo(1, 0)
+          ..lineTo(0.42, 0.42)
+          ..lineTo(0, 1)
           ..close();
       case QuadForm.windmill:
         return Path()
-          ..moveTo(at(0, 0).dx, at(0, 0).dy)
-          ..lineTo(at(1, 0).dx, at(1, 0).dy)
-          ..lineTo(at(1, 0.52).dx, at(1, 0.52).dy)
-          ..lineTo(at(0, 1).dx, at(0, 1).dy)
+          ..moveTo(0, 0)
+          ..lineTo(1, 0)
+          ..lineTo(1, 0.52)
+          ..lineTo(0, 1)
           ..close();
     }
-  }
-
-  /// Fill gradient for a piece, lit consistently from the top-left of the
-  /// board regardless of which quadrant it sits in.
-  static ui.Shader shaderFor(QuadColor color, Corner corner) {
-    final key = (color, corner);
-    return _shaders[key] ??= _buildShader(color, corner);
-  }
-
-  static final Map<(QuadColor, Corner), ui.Shader> _shaders = {};
-
-  static ui.Shader _buildShader(QuadColor color, Corner corner) {
-    // Global light travels along (1, 1); undo the quadrant rotation so the
-    // highlight always lands on the board's upper-left side.
-    final a = -angleOf(corner);
-    final dx = math.cos(a) * 0.7071 - math.sin(a) * 0.7071;
-    final dy = math.sin(a) * 0.7071 + math.cos(a) * 0.7071;
-    return ui.Gradient.linear(
-      Offset(-dx * 1.1, -dy * 1.1),
-      Offset(dx * 1.1, dy * 1.1),
-      [Palette.pieceSheen(color), Palette.piece(color), Palette.pieceShade(color)],
-      const [0.0, 0.45, 1.0],
-    );
   }
 }
 
@@ -136,12 +116,14 @@ class ShapePainter extends CustomPainter {
   final Set<Corner> rejectedCorners;
   final double reject;
 
+  static final Paint _fill = Paint()..isAntiAlias = true;
+
   static final Paint _outline = Paint()
     ..style = PaintingStyle.stroke
-    ..strokeJoin = StrokeJoin.round
-    ..strokeCap = StrokeCap.round
-    ..isAntiAlias = true
-    ..color = const Color(0xFF0A1116);
+    ..strokeJoin = StrokeJoin.miter
+    ..strokeMiterLimit = 4
+    ..strokeCap = StrokeCap.butt
+    ..isAntiAlias = true;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -156,19 +138,25 @@ class ShapePainter extends CustomPainter {
       _paintGuides(canvas, radius);
     }
 
+    // Bottom → top by layer. Bottom layers are largest; each layer above is
+    // scaled by [layerFalloff] so the stack reads as concentric rings.
+    // Within a layer: all fills, then all outlines, so neighbours share an
+    // even seam and upper fills cover lower outlines in the centre.
+    final depth = shape.depth;
+    for (var layer = 0; layer < depth; layer++) {
+      final scale =
+          radius * math.pow(ShapeGeometry.layerFalloff, layer).toDouble();
+      _forLayer(canvas, layer, (piece, corner) {
+        _paintFill(canvas, piece, scale);
+      });
+      _forLayer(canvas, layer, (piece, corner) {
+        _paintOutline(canvas, piece.form, scale, layer);
+      });
+    }
+
     for (final corner in Corner.values) {
-      final quadrant = shape[corner];
       canvas.save();
       canvas.rotate(ShapeGeometry.angleOf(corner));
-
-      if (quadrant.isEmpty) {
-        if (ghostEmpty) _paintGhost(canvas, radius);
-      } else {
-        for (var i = 0; i < quadrant.layers.length; i++) {
-          _paintPiece(canvas, quadrant.layers[i], corner, radius, i);
-        }
-      }
-
       if (reject > 0 && rejectedCorners.contains(corner)) {
         _paintReject(canvas, radius);
       }
@@ -182,37 +170,69 @@ class ShapePainter extends CustomPainter {
     canvas.restore();
   }
 
-  void _paintPiece(Canvas canvas, LayerPiece piece, Corner corner, double radius, int layer) {
-    final scale = radius * math.pow(ShapeGeometry.layerFalloff, layer).toDouble();
+  void _forLayer(
+    Canvas canvas,
+    int layer,
+    void Function(LayerPiece piece, Corner corner) paint,
+  ) {
+    for (final corner in Corner.values) {
+      final quadrant = shape[corner];
+      if (layer >= quadrant.layers.length) continue;
+      canvas.save();
+      canvas.rotate(ShapeGeometry.angleOf(corner));
+      paint(quadrant.layers[layer], corner);
+      canvas.restore();
+    }
+  }
+
+  void _paintFill(Canvas canvas, LayerPiece piece, double scale) {
+    canvas.save();
+    canvas.scale(scale * ShapeGeometry.fillBleed);
+    _fill.color = Palette.piece(piece.color).withValues(alpha: opacity);
+    canvas.drawPath(ShapeGeometry.unitPath(piece.form), _fill);
+    canvas.restore();
+  }
+
+  void _paintOutline(Canvas canvas, QuadForm form, double scale, int layer) {
     canvas.save();
     canvas.scale(scale);
 
-    final path = ShapeGeometry.unitPath(piece.form);
-    final fill = Paint()
-      ..shader = ShapeGeometry.shaderFor(piece.color, corner)
-      ..isAntiAlias = true;
-    if (opacity < 1) {
-      canvas.saveLayer(null, Paint()..color = Colors.white.withValues(alpha: opacity));
+    // Use the fixed outline width in logical pixels, independent of scale.
+    final outlineWidth = ShapeGeometry.outlineWidth;
+
+    if (form == QuadForm.circle) {
+      canvas.drawLine(
+        Offset(-1, 0),
+        Offset(1, 0),
+        _outline
+          ..strokeWidth = outlineWidth
+          ..color = const Color(0xFF0A1116).withValues(alpha: 0.5 * opacity),
+      );
+      canvas.drawArc(
+        Rect.fromCircle(center: Offset.zero, radius: 1),
+        0,
+        math.pi / 2,
+        false,
+        _outline
+          ..strokeWidth = outlineWidth
+          ..color = const Color(0xFF0A1116).withValues(alpha: 0.5 * opacity),
+      );
+    } else {
+      canvas.drawPath(
+        ShapeGeometry.unitPath(form),
+        _outline
+          ..strokeWidth = outlineWidth
+          ..color = const Color(0xFF0A1116).withValues(alpha: 0.5 * opacity),
+      );
     }
-    canvas.drawPath(path, fill);
 
-    // Outline width is expressed in unit space, so it thickens with the piece
-    // and keeps deep layers legible.
-    canvas.drawPath(
-      path,
-      _outline
-        ..strokeWidth = 0.055
-        ..color = const Color(0xFF0A1116).withValues(alpha: 0.55 * opacity),
-    );
-
-    if (opacity < 1) canvas.restore();
     canvas.restore();
   }
 
   void _paintGuides(Canvas canvas, double radius) {
     final hairline = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
+      ..strokeWidth = 1
       ..color = Palette.hairline.withValues(alpha: 0.7);
 
     // Seam cross.
@@ -220,7 +240,11 @@ class ShapePainter extends CustomPainter {
     canvas.drawLine(Offset(-reach, 0), Offset(reach, 0), hairline);
     canvas.drawLine(Offset(0, -reach), Offset(0, reach), hairline);
 
-    _dashedCircle(canvas, radius, hairline..color = Palette.hairlineBright.withValues(alpha: 0.5));
+    _dashedCircle(
+      canvas,
+      radius,
+      hairline..color = Palette.hairlineBright.withValues(alpha: 0.5),
+    );
     _dashedCircle(
       canvas,
       radius * ShapeGeometry.layerFalloff,
@@ -235,19 +259,6 @@ class ShapePainter extends CustomPainter {
     for (var i = 0; i < dashes; i++) {
       canvas.drawArc(rect, i * sweep, sweep * 0.5, false, paint);
     }
-  }
-
-  void _paintGhost(Canvas canvas, double radius) {
-    canvas.save();
-    canvas.scale(radius);
-    canvas.drawPath(
-      ShapeGeometry.unitPath(QuadForm.circle),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.03
-        ..color = Palette.hairlineBright.withValues(alpha: 0.5),
-    );
-    canvas.restore();
   }
 
   void _paintReject(Canvas canvas, double radius) {

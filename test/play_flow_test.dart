@@ -45,8 +45,8 @@ void main() {
 
     await tester.tap(find.text('TURN'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 900));
-    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    // Win celebration + sheet open; avoid pumpAndSettle (ambient BG ticker never idles).
+    await tester.pump(const Duration(milliseconds: 1200));
 
     expect(find.byType(WinSheet), findsOneWidget);
     expect(find.text('Solved'), findsOneWidget);
@@ -65,13 +65,15 @@ void main() {
     expect(chips, findsNWidgets(2));
 
     await tester.tap(chips.first);
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(); // mount flight overlay
+    await tester.pump(const Duration(milliseconds: 500)); // finish flight + place
     expect(find.text('1'), findsOneWidget);
 
     await tester.tap(find.bySemanticsLabel(RegExp('^Blueprint')).last);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 900));
-    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 500));
+    // Win celebration + sheet open; avoid pumpAndSettle (ambient BG ticker never idles).
+    await tester.pump(const Duration(milliseconds: 1200));
 
     expect(find.byType(WinSheet), findsOneWidget);
   });
@@ -81,7 +83,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     await tester.tap(find.bySemanticsLabel(RegExp('^Blueprint')).first);
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     final container = ProviderScope.containerOf(
       tester.element(find.byType(PlayScreen)),
@@ -91,12 +94,13 @@ void main() {
     expect(container.read(provider).game.board.isEmpty, isFalse);
 
     await tester.tap(find.text('UNDO'));
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 550));
     expect(container.read(provider).game.moves, 0);
     expect(container.read(provider).game.board.isEmpty, isTrue);
 
     await tester.tap(find.bySemanticsLabel(RegExp('^Blueprint')).first);
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.text('RESET'));
     await tester.pump(const Duration(milliseconds: 400));
     expect(container.read(provider).game.moves, 0);

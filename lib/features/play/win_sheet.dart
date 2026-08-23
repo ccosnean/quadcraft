@@ -6,6 +6,8 @@ import '../../ui/shape_painter.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets.dart';
 
+import 'share_card.dart';
+
 enum WinAction { replay, next, levels }
 
 /// Level-clear summary. Shown as a non-dismissible sheet so the run always
@@ -25,7 +27,7 @@ class WinSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final beatPar = result.moves <= level.parMoves;
+    final newBest = result.isNewBestMoves || result.isFirstClear;
 
     return Container(
       decoration: const BoxDecoration(
@@ -74,18 +76,32 @@ class WinSheet extends StatelessWidget {
               _StatTile(
                 label: 'Moves',
                 value: '${result.moves}',
-                sub: 'best ${result.bestMoves}  ·  par ${level.parMoves}',
+                sub: result.isFirstClear
+                    ? 'Your score to beat'
+                    : 'Personal best  ${result.bestMoves}',
                 badge: result.isNewBestMoves && !result.isFirstClear ? 'New best' : null,
-                highlight: beatPar,
+                highlight: newBest,
               ),
               const SizedBox(height: 12),
               Text(
-                beatPar
-                    ? 'Clean line. That matches the intended solution.'
-                    : 'Solved in ${result.moves} moves. Par is ${level.parMoves}.',
+                newBest
+                    ? 'Nice run — share it and see if friends can beat ${result.moves}.'
+                    : 'Cleared in ${result.moves} moves. Best so far: ${result.bestMoves}.',
                 style: text.bodySmall,
               ),
               const SizedBox(height: 20),
+              ActionButton(
+                label: 'Share',
+                icon: Icons.ios_share_rounded,
+                expand: true,
+                onPressed: () => showShareScoreSheet(
+                  context: context,
+                  level: level,
+                  moves: result.moves,
+                  isNewBest: newBest,
+                ),
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   ActionButton(
@@ -97,11 +113,14 @@ class WinSheet extends StatelessWidget {
                   Expanded(
                     child: ActionButton(
                       label: hasNext ? 'Next level' : 'All levels',
-                      icon: hasNext ? Icons.arrow_forward_rounded : Icons.grid_view_rounded,
+                      icon: hasNext
+                          ? Icons.arrow_forward_rounded
+                          : Icons.grid_view_rounded,
                       primary: true,
                       expand: true,
-                      onPressed: () => Navigator.of(context)
-                          .pop(hasNext ? WinAction.next : WinAction.levels),
+                      onPressed: () => Navigator.of(context).pop(
+                        hasNext ? WinAction.next : WinAction.levels,
+                      ),
                     ),
                   ),
                 ],

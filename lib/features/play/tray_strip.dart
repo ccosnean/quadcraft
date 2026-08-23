@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:ui' show lerpDouble;
+
 import 'package:flutter/material.dart';
 
 import '../../core/shape/shape.dart';
@@ -5,25 +8,13 @@ import '../../ui/shape_painter.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets.dart';
 
-/// What a tray item hands to the board when dropped.
-sealed class TrayPayload {
-  const TrayPayload();
-}
+/// Tap callbacks include the chip's global bounds so the play screen can fly
+/// a ghost from the tray to the plate.
+typedef TrayShapeTap = void Function(Shape shape, Rect globalOrigin);
+typedef TrayColorTap = void Function(QuadColor color, Rect globalOrigin);
 
-class ShapePayload extends TrayPayload {
-  const ShapePayload(this.shape);
-
-  final Shape shape;
-}
-
-class ColorPayload extends TrayPayload {
-  const ColorPayload(this.color);
-
-  final QuadColor color;
-}
-
-/// Bottom tray: reusable blueprints and available paints, sized and positioned
-/// for a thumb.
+/// Bottom tray: reusable blueprints and paints. Tap places; the list scrolls
+/// freely with no drag competing for the gesture.
 class TrayStrip extends StatelessWidget {
   const TrayStrip({
     super.key,
@@ -31,18 +22,20 @@ class TrayStrip extends StatelessWidget {
     required this.colors,
     required this.onPlaceShape,
     required this.onPaint,
-    required this.onDragStart,
     this.blockedShapeIds = const <String>{},
+    this.enabled = true,
   });
 
   final List<Shape> shapes;
   final List<QuadColor> colors;
-  final ValueChanged<Shape> onPlaceShape;
-  final ValueChanged<QuadColor> onPaint;
-  final VoidCallback onDragStart;
+  final TrayShapeTap onPlaceShape;
+  final TrayColorTap onPaint;
 
   /// Blueprints that cannot currently be placed, shown dimmed.
   final Set<String> blockedShapeIds;
+
+  /// When false (e.g. a flight is in progress), taps are ignored.
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +48,10 @@ class TrayStrip extends StatelessWidget {
             children: [
               const Overline('Blueprints'),
               const Spacer(),
-              Overline('drag or tap', color: Palette.inkFaint.withValues(alpha: 0.8)),
+              Overline(
+                'tap to place',
+                color: Palette.inkFaint.withValues(alpha: 0.8),
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -76,8 +72,8 @@ class TrayStrip extends StatelessWidget {
                     child: _ShapeChip(
                       shape: shape,
                       blocked: blockedShapeIds.contains(shape.id),
-                      onTap: () => onPlaceShape(shape),
-                      onDragStart: onDragStart,
+                      enabled: enabled,
+                      onTap: (origin) => onPlaceShape(shape, origin),
                     ),
                   );
                 },
@@ -98,8 +94,8 @@ class TrayStrip extends StatelessWidget {
                   key: ValueKey('paint-${colors[index].name}'),
                   child: _ColorChip(
                     color: colors[index],
-                    onTap: () => onPaint(colors[index]),
-                    onDragStart: onDragStart,
+                    enabled: enabled,
+                    onTap: (origin) => onPaint(colors[index], origin),
                   ),
                 ),
               ),
@@ -125,18 +121,24 @@ class _EmptyTrayHint extends StatelessWidget {
       );
 }
 
+Rect? _globalBoundsOf(BuildContext context) {
+  final box = context.findRenderObject() as RenderBox?;
+  if (box == null || !box.hasSize) return null;
+  return box.localToGlobal(Offset.zero) & box.size;
+}
+
 class _ShapeChip extends StatelessWidget {
   const _ShapeChip({
     required this.shape,
     required this.blocked,
+    required this.enabled,
     required this.onTap,
-    required this.onDragStart,
   });
 
   final Shape shape;
   final bool blocked;
-  final VoidCallback onTap;
-  final VoidCallback onDragStart;
+  final bool enabled;
+  final ValueChanged<Rect> onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -159,21 +161,22 @@ class _ShapeChip extends StatelessWidget {
 
     return Semantics(
       button: true,
+      enabled: enabled && !blocked,
       label: 'Blueprint ${shape.id}',
       child: SizedBox(
         width: 78,
-        child: Draggable<TrayPayload>(
-          data: ShapePayload(shape),
-          onDragStarted: onDragStart,
-          dragAnchorStrategy: pointerDragAnchorStrategy,
-          feedback: _DragGhost(
-            child: SizedBox.square(
-              dimension: 112,
-              child: ShapeView(shape: shape, size: 112),
-            ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: !enabled || blocked
+                ? null
+                : () {
+                    final origin = _globalBoundsOf(context);
+                    if (origin != null) onTap(origin);
+                  },
+            child: well,
           ),
-          childWhenDragging: Opacity(opacity: 0.25, child: well),
-          child: GestureDetector(onTap: onTap, child: well),
         ),
       ),
     );
@@ -181,25 +184,35 @@ class _ShapeChip extends StatelessWidget {
 }
 
 class _ColorChip extends StatelessWidget {
-  const _ColorChip({required this.color, required this.onTap, required this.onDragStart});
+  const _ColorChip({
+    required this.color,
+    required this.enabled,
+    required this.onTap,
+  });
 
   final QuadColor color;
-  final VoidCallback onTap;
-  final VoidCallback onDragStart;
+  final bool enabled;
+  final ValueChanged<Rect> onTap;
 
   @override
   Widget build(BuildContext context) {
     final swatch = _Swatch(color: color, diameter: 48);
     return Semantics(
       button: true,
+      enabled: enabled,
       label: '${Palette.label(color)} paint',
-      child: Draggable<TrayPayload>(
-        data: ColorPayload(color),
-        onDragStarted: onDragStart,
-        dragAnchorStrategy: pointerDragAnchorStrategy,
-        feedback: _DragGhost(child: _Swatch(color: color, diameter: 76)),
-        childWhenDragging: Opacity(opacity: 0.25, child: swatch),
-        child: GestureDetector(onTap: onTap, child: swatch),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: !enabled
+              ? null
+              : () {
+                  final origin = _globalBoundsOf(context);
+                  if (origin != null) onTap(origin);
+                },
+          child: swatch,
+        ),
       ),
     );
   }
@@ -218,13 +231,11 @@ class _Swatch extends StatelessWidget {
       height: diameter,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
-          center: const Alignment(-0.4, -0.5),
-          radius: 1.0,
-          colors: [Palette.pieceSheen(color), Palette.piece(color), Palette.pieceShade(color)],
-          stops: const [0.0, 0.55, 1.0],
+        color: Palette.piece(color),
+        border: Border.all(
+          color: Colors.black.withValues(alpha: 0.45),
+          width: 1.5,
         ),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.45), width: 1.5),
         boxShadow: [
           BoxShadow(
             color: Palette.piece(color).withValues(alpha: 0.35),
@@ -232,40 +243,6 @@ class _Swatch extends StatelessWidget {
             offset: Offset(0, diameter * 0.08),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// What the finger carries around: lifted, glowing, slightly above the touch.
-class _DragGhost extends StatelessWidget {
-  const _DragGhost({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Transform.translate(
-      offset: const Offset(-52, -68),
-      child: IgnorePointer(
-        child: Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Palette.brass.withValues(alpha: 0.25),
-                blurRadius: 28,
-                spreadRadius: 4,
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.4),
-                blurRadius: 18,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: child,
-        ),
       ),
     );
   }
@@ -281,7 +258,8 @@ class _ChipEntrance extends StatefulWidget {
   State<_ChipEntrance> createState() => _ChipEntranceState();
 }
 
-class _ChipEntranceState extends State<_ChipEntrance> with SingleTickerProviderStateMixin {
+class _ChipEntranceState extends State<_ChipEntrance>
+    with SingleTickerProviderStateMixin {
   late final _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 320),
@@ -295,10 +273,132 @@ class _ChipEntranceState extends State<_ChipEntrance> with SingleTickerProviderS
 
   @override
   Widget build(BuildContext context) {
-    final curve = CurvedAnimation(parent: _controller, curve: Curves.easeOutBack);
+    final curve = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutBack,
+    );
     return ScaleTransition(
       scale: Tween(begin: 0.7, end: 1.0).animate(curve),
       child: FadeTransition(opacity: _controller, child: widget.child),
+    );
+  }
+}
+
+/// Flies [child] from [from] to [to] over the app overlay, then completes.
+Future<void> flyToBoard({
+  required BuildContext context,
+  required Rect from,
+  required Rect to,
+  required Widget child,
+  Duration duration = const Duration(milliseconds: 320),
+}) {
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
+  if (overlay == null) return Future.value();
+
+  final completer = Completer<void>();
+  late final OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (context) => _FlightLayer(
+      from: from,
+      to: to,
+      duration: duration,
+      onDone: () {
+        entry.remove();
+        if (!completer.isCompleted) completer.complete();
+      },
+      child: child,
+    ),
+  );
+  overlay.insert(entry);
+  return completer.future;
+}
+
+class _FlightLayer extends StatefulWidget {
+  const _FlightLayer({
+    required this.from,
+    required this.to,
+    required this.duration,
+    required this.onDone,
+    required this.child,
+  });
+
+  final Rect from;
+  final Rect to;
+  final Duration duration;
+  final VoidCallback onDone;
+  final Widget child;
+
+  @override
+  State<_FlightLayer> createState() => _FlightLayerState();
+}
+
+class _FlightLayerState extends State<_FlightLayer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: widget.duration,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.forward().whenComplete(widget.onDone);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final motion = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOutCubic,
+    );
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: motion,
+        builder: (context, child) {
+          final t = motion.value;
+          // Slight arc upward mid-flight.
+          final lift = (1 - (2 * t - 1).abs()) * 36;
+          final rect = Rect.lerp(widget.from, widget.to, t)!;
+          final scale = lerpDouble(1.0, 1.15, (1 - (2 * t - 1).abs()))!;
+          final opacity = t < 0.85 ? 1.0 : (1 - (t - 0.85) / 0.15);
+
+          return Stack(
+            children: [
+              Positioned(
+                left: rect.left,
+                top: rect.top - lift,
+                width: rect.width,
+                height: rect.height,
+                child: Opacity(
+                  opacity: opacity.clamp(0.0, 1.0),
+                  child: Transform.scale(
+                    scale: scale,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        boxShadow: [
+                          BoxShadow(
+                            color: Palette.brass.withValues(alpha: 0.22 * opacity),
+                            blurRadius: 28,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: child,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+        child: widget.child,
+      ),
     );
   }
 }

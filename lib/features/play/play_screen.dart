@@ -25,18 +25,18 @@ class PlayScreen extends ConsumerStatefulWidget {
 
   final int levelNumber;
 
-  static Route<void> route(int levelNumber) => MaterialPageRoute(
-        builder: (_) => PlayScreen(levelNumber: levelNumber),
-      );
+  static Route<void> route(int levelNumber) =>
+      MaterialPageRoute(builder: (_) => PlayScreen(levelNumber: levelNumber));
 
   @override
   ConsumerState<PlayScreen> createState() => _PlayScreenState();
 }
 
 class _PlayScreenState extends ConsumerState<PlayScreen> {
-  TrayPayload? _hover;
+  final GlobalKey _boardKey = GlobalKey();
   int _confetti = 0;
   bool _sheetOpen = false;
+  bool _flying = false;
   Timer? _winTimer;
 
   PlayController get _controller =>
@@ -48,13 +48,80 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     super.dispose();
   }
 
-  void _apply(TrayPayload payload) {
-    switch (payload) {
-      case ShapePayload(:final shape):
-        _controller.drop(shape);
-      case ColorPayload(:final color):
-        _controller.paint(color);
+  Rect? get _boardRect {
+    final box = _boardKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+
+  Future<void> _placeShape(Shape shape, Rect origin) async {
+    if (_flying || _sheetOpen) return;
+    final target = _boardRect;
+    if (target == null) {
+      _controller.drop(shape);
+      return;
     }
+    setState(() => _flying = true);
+    ref.read(soundBankProvider).play(Sfx.pickup);
+    // Fly a slightly larger ghost into the plate, then commit the place.
+    final ghostSize = math.min(target.shortestSide * 0.72, 160.0);
+    final dest = Rect.fromCenter(
+      center: target.center,
+      width: ghostSize,
+      height: ghostSize,
+    );
+    await flyToBoard(
+      context: context,
+      from: origin,
+      to: dest,
+      child: ShapeView(shape: shape, size: ghostSize),
+    );
+    if (!mounted) return;
+    _controller.drop(shape);
+    setState(() => _flying = false);
+  }
+
+  Future<void> _paintColor(QuadColor color, Rect origin) async {
+    if (_flying || _sheetOpen) return;
+    final target = _boardRect;
+    if (target == null) {
+      _controller.paint(color);
+      return;
+    }
+    setState(() => _flying = true);
+    ref.read(soundBankProvider).play(Sfx.pickup);
+    final ghostSize = 56.0;
+    final dest = Rect.fromCenter(
+      center: target.center,
+      width: ghostSize,
+      height: ghostSize,
+    );
+    await flyToBoard(
+      context: context,
+      from: origin,
+      to: dest,
+      child: Container(
+        width: ghostSize,
+        height: ghostSize,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Palette.piece(color),
+          border: Border.all(
+            color: Colors.black.withValues(alpha: 0.45),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Palette.piece(color).withValues(alpha: 0.4),
+              blurRadius: 18,
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    _controller.paint(color);
+    setState(() => _flying = false);
   }
 
   /// Lets the confetti and the plate glow land before the sheet covers them.
@@ -63,7 +130,10 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     _sheetOpen = true;
     setState(() => _confetti++);
     _winTimer?.cancel();
-    _winTimer = Timer(const Duration(milliseconds: 750), () => _openWinSheet(level));
+    _winTimer = Timer(
+      const Duration(milliseconds: 750),
+      () => _openWinSheet(level),
+    );
   }
 
   Future<void> _openWinSheet(Level level) async {
@@ -89,7 +159,9 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       case WinAction.replay:
         _controller.reset();
       case WinAction.next:
-        Navigator.of(context).pushReplacement(PlayScreen.route(level.number + 1));
+        Navigator.of(
+          context,
+        ).pushReplacement(PlayScreen.route(level.number + 1));
       case WinAction.levels:
       case null:
         Navigator.of(context).pop();
@@ -111,7 +183,11 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
         ),
         content: Row(
           children: [
-            const Icon(Icons.lightbulb_outline_rounded, color: Palette.brassBright, size: 20),
+            const Icon(
+              Icons.lightbulb_outline_rounded,
+              color: Palette.brassBright,
+              size: 20,
+            ),
             const SizedBox(width: 12),
             Expanded(child: _hintBody(move)),
           ],
@@ -121,16 +197,24 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   }
 
   Widget _hintBody(GameMove? move) {
-    final style = Theme.of(context).textTheme.bodyMedium?.copyWith(color: Palette.ink);
+    final style = Theme.of(
+      context,
+    ).textTheme.bodyMedium?.copyWith(color: Palette.ink);
     switch (move) {
       case null:
-        return Text('Nothing left to suggest. The plate should match already.', style: style);
+        return Text(
+          'Nothing left to suggest. The plate should match already.',
+          style: style,
+        );
       case RotateMove():
         return Text('Turn the plate a quarter clockwise.', style: style);
       case CutMove():
         return Text('Cut the plate and bank both halves.', style: style);
       case PaintMove(:final color):
-        return Text('Paint everything ${Palette.label(color).toLowerCase()}.', style: style);
+        return Text(
+          'Paint everything ${Palette.label(color).toLowerCase()}.',
+          style: style,
+        );
       case StackMove(:final shapeId):
         return Row(
           children: [
@@ -153,11 +237,6 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     });
 
     final board = state.game.board;
-    final hoverValid = switch (_hover) {
-      ShapePayload(:final shape) => ShapeOps.canStack(board, shape),
-      ColorPayload(:final color) => ShapeOps.canPaint(board, color),
-      null => true,
-    };
     final blockedIds = {
       for (final shape in state.game.tray)
         if (!ShapeOps.canStack(board, shape)) shape.id,
@@ -177,32 +256,22 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                   ),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          final size = math.min(
-                            constraints.maxWidth,
-                            constraints.maxHeight,
-                          ).clamp(200.0, 380.0);
+                          final size = math
+                              .min(constraints.maxWidth, constraints.maxHeight)
+                              .clamp(200.0, 380.0);
                           return Center(
-                            child: DragTarget<TrayPayload>(
-                              onWillAcceptWithDetails: (details) {
-                                setState(() => _hover = details.data);
-                                return true;
-                              },
-                              onLeave: (_) => setState(() => _hover = null),
-                              onAcceptWithDetails: (details) {
-                                setState(() => _hover = null);
-                                _apply(details.data);
-                              },
-                              builder: (context, candidate, rejected) => BoardStage(
-                                shape: board,
-                                size: size,
-                                effect: state.effect,
-                                effectId: state.effectId,
-                                dropGlow: candidate.isEmpty ? 0 : 1,
-                                dropGlowColor: hoverValid ? Palette.brass : Palette.danger,
-                              ),
+                            child: BoardStage(
+                              key: _boardKey,
+                              shape: board,
+                              size: size,
+                              effect: state.effect,
+                              effectId: state.effectId,
                             ),
                           );
                         },
@@ -216,7 +285,11 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                       ignoring: state.solved,
                       child: Column(
                         children: [
-                          _ToolRow(level: level, state: state, controller: _controller),
+                          _ToolRow(
+                            level: level,
+                            state: state,
+                            controller: _controller,
+                          ),
                           const SizedBox(height: 12),
                           Padding(
                             padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
@@ -224,10 +297,9 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                               shapes: state.game.tray,
                               colors: level.colors,
                               blockedShapeIds: blockedIds,
-                              onPlaceShape: _controller.drop,
-                              onPaint: _controller.paint,
-                              onDragStart: () =>
-                                  ref.read(soundBankProvider).play(Sfx.pickup),
+                              enabled: !_flying,
+                              onPlaceShape: _placeShape,
+                              onPaint: _paintColor,
                             ),
                           ),
                         ],
@@ -269,7 +341,10 @@ class _TopBar extends ConsumerWidget {
               children: [
                 Overline('level ${level.number.toString().padLeft(2, '0')}'),
                 const SizedBox(height: 1),
-                Text(level.name, style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  level.name,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ],
             ),
           ),
@@ -281,7 +356,9 @@ class _TopBar extends ConsumerWidget {
           ),
           IconButton(
             onPressed: () => ref.read(mutedProvider.notifier).toggle(),
-            icon: Icon(muted ? Icons.volume_off_rounded : Icons.volume_up_rounded),
+            icon: Icon(
+              muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+            ),
             color: Palette.inkMuted,
             tooltip: muted ? 'Unmute' : 'Mute',
           ),
@@ -311,7 +388,10 @@ class _GoalHeader extends StatelessWidget {
               opacity: animation,
               child: ScaleTransition(
                 scale: Tween(begin: 0.92, end: 1.0).animate(
-                  CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  ),
                 ),
                 child: _TargetPreviewDialog(goal: level.goal, name: level.name),
               ),
@@ -325,7 +405,7 @@ class _GoalHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Panel(
-      padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+      padding: const EdgeInsets.fromLTRB(12, 12, 22, 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -362,13 +442,8 @@ class _GoalHeader extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          Readout(
-            label: 'moves',
-            value: '${state.game.moves}',
-            hint: 'par ${level.parMoves}',
-            highlight: state.game.moves > level.parMoves,
-          ),
+          const SizedBox(width: 22),
+          Readout(label: 'moves', value: '${state.game.moves}'),
         ],
       ),
     );
@@ -383,7 +458,10 @@ class _TargetPreviewDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final side = (MediaQuery.sizeOf(context).shortestSide * 0.72).clamp(220.0, 340.0);
+    final side = (MediaQuery.sizeOf(context).shortestSide * 0.72).clamp(
+      220.0,
+      340.0,
+    );
     return Material(
       color: Colors.transparent,
       child: Padding(
@@ -416,7 +494,11 @@ class _TargetPreviewDialog extends StatelessWidget {
 }
 
 class _ToolRow extends StatelessWidget {
-  const _ToolRow({required this.level, required this.state, required this.controller});
+  const _ToolRow({
+    required this.level,
+    required this.state,
+    required this.controller,
+  });
 
   final Level level;
   final PlayState state;
@@ -438,7 +520,7 @@ class _ToolRow extends StatelessWidget {
         ToolButton(
           icon: Icons.content_cut_rounded,
           label: 'Cut',
-          accent: level.canCut,
+          accent: false,
           onPressed: board.isEmpty ? null : controller.cut,
         ),
         const SizedBox(width: 10),

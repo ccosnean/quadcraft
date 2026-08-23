@@ -37,7 +37,7 @@ final List<Level> kLevels = [
   Level(
     number: 3,
     name: 'Drop In',
-    brief: 'Drag a blueprint from the tray onto the plate.',
+    brief: 'Tap a blueprint in the tray to place it on the plate.',
     goal: _s('Cu/Cu/-/-'),
     tray: [_s('Cu/-/-/-'), _s('-/Cu/-/-')],
     solution: [_place('Cu/-/-/-'), _place('-/Cu/-/-')],

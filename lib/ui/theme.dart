@@ -25,7 +25,7 @@ abstract final class Palette {
   static const success = Color(0xFF4FB477);
   static const danger = Color(0xFFE05B4A);
 
-  /// Fill colour for a piece.
+  /// Flat fill colour for a piece.
   static Color piece(QuadColor color) => switch (color) {
         QuadColor.uncolored => const Color(0xFF93A5AE),
         QuadColor.red => const Color(0xFFE05B4A),
@@ -35,14 +35,6 @@ abstract final class Palette {
         QuadColor.purple => const Color(0xFFA272DD),
         QuadColor.cyan => const Color(0xFF45C2C9),
       };
-
-  /// Highlight used for the top-left sheen on a piece.
-  static Color pieceSheen(QuadColor color) =>
-      Color.lerp(piece(color), Colors.white, 0.34)!;
-
-  /// Shade used for the bottom-right falloff on a piece.
-  static Color pieceShade(QuadColor color) =>
-      Color.lerp(piece(color), const Color(0xFF0A1014), 0.42)!;
 
   static String label(QuadColor color) => switch (color) {
         QuadColor.uncolored => 'Bare',
