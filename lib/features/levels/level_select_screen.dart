@@ -20,6 +20,8 @@ class LevelSelectScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final progress = ref.watch(progressProvider);
+    final l10n = ref.watch(l10nProvider);
+    final sections = kLevelSections;
 
     return Scaffold(
       body: GrainBackground(
@@ -37,7 +39,10 @@ class LevelSelectScreen extends ConsumerWidget {
                       color: Palette.inkMuted,
                     ),
                     Expanded(
-                      child: Text('Levels', style: Theme.of(context).textTheme.titleLarge),
+                      child: Text(
+                        l10n.levels,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
                     ),
                     Text(
                       '${progress.clearedCount} / ${kLevels.length}',
@@ -50,27 +55,56 @@ class LevelSelectScreen extends ConsumerWidget {
                 ),
               ),
               Expanded(
-                child: GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 0.82,
-                  ),
-                  itemCount: kLevels.length,
-                  itemBuilder: (context, index) {
-                    final level = kLevels[index];
-                    return _LevelCard(
-                      level: level,
-                      record: progress[level.number],
-                      locked: !progress.isUnlocked(level.number),
-                      onTap: () {
-                        ref.read(soundBankProvider).play(Sfx.tap);
-                        Navigator.of(context).push(PlayScreen.route(level.number));
-                      },
-                    );
-                  },
+                child: CustomScrollView(
+                  slivers: [
+                    for (final entry in sections) ...[
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+                          child: Text(
+                            entry.key,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: Palette.brassBright,
+                                  letterSpacing: 0.4,
+                                ),
+                          ),
+                        ),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        sliver: SliverGrid(
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 3,
+                                mainAxisSpacing: 12,
+                                crossAxisSpacing: 12,
+                                childAspectRatio: 0.82,
+                              ),
+                          delegate: SliverChildBuilderDelegate((
+                            context,
+                            index,
+                          ) {
+                            final level = entry.value[index];
+                            return _LevelCard(
+                              level: level,
+                              record: progress[level.number],
+                              locked: !progress.isUnlocked(level.number),
+                              lockedLabel: l10n.locked,
+                              movesLabel: (n) => l10n.bestMoves(n),
+                              onTap: () {
+                                ref.read(soundBankProvider).play(Sfx.tap);
+                                Navigator.of(
+                                  context,
+                                ).push(PlayScreen.route(level.number));
+                              },
+                            );
+                          }, childCount: entry.value.length),
+                        ),
+                      ),
+                    ],
+                    const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  ],
                 ),
               ),
             ],
@@ -86,12 +120,16 @@ class _LevelCard extends StatelessWidget {
     required this.level,
     required this.record,
     required this.locked,
+    required this.lockedLabel,
+    required this.movesLabel,
     required this.onTap,
   });
 
   final Level level;
   final LevelRecord? record;
   final bool locked;
+  final String lockedLabel;
+  final String Function(int) movesLabel;
   final VoidCallback onTap;
 
   @override
@@ -116,7 +154,9 @@ class _LevelCard extends StatelessWidget {
                 end: Alignment.bottomCenter,
                 colors: [Palette.panelRaised, Palette.panel],
               ),
-              border: Border.all(color: cleared ? Palette.brassDim : Palette.hairline),
+              border: Border.all(
+                color: cleared ? Palette.brassDim : Palette.hairline,
+              ),
             ),
             child: Column(
               children: [
@@ -131,23 +171,34 @@ class _LevelCard extends StatelessWidget {
                     ),
                     const Spacer(),
                     if (locked)
-                      const Icon(Icons.lock_rounded, size: 13, color: Palette.inkFaint)
+                      const Icon(
+                        Icons.lock_rounded,
+                        size: 13,
+                        color: Palette.inkFaint,
+                      )
                     else if (cleared)
-                      const Icon(Icons.check_rounded, size: 14, color: Palette.brassBright),
+                      const Icon(
+                        Icons.check_rounded,
+                        size: 14,
+                        color: Palette.brassBright,
+                      ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Expanded(
                   child: locked
                       ? const Center(
-                          child: Icon(Icons.help_outline_rounded,
-                              size: 26, color: Palette.inkFaint),
+                          child: Icon(
+                            Icons.help_outline_rounded,
+                            size: 26,
+                            color: Palette.inkFaint,
+                          ),
                         )
                       : ShapeView(shape: level.goal),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  locked ? 'Locked' : level.name,
+                  locked ? lockedLabel : level.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: text.bodySmall?.copyWith(
@@ -156,7 +207,7 @@ class _LevelCard extends StatelessWidget {
                 ),
                 if (best != null)
                   Text(
-                    '${best.bestMoves} moves',
+                    movesLabel(best.bestMoves),
                     style: text.bodySmall?.copyWith(fontSize: 10),
                   ),
               ],

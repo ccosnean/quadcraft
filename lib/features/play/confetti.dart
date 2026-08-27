@@ -8,8 +8,8 @@ import '../../ui/theme.dart';
 
 /// Celebration burst played over the board when a level is solved.
 ///
-/// Each particle is a single quadrant silhouette (circle / square / star /
-/// windmill) in a random piece colour — never a combined 2×2 plate.
+/// Each particle is a single quadrant silhouette in a random piece colour —
+/// never a combined 2×2 plate.
 class ConfettiBurst extends StatefulWidget {
   const ConfettiBurst({super.key, required this.trigger, this.particles = 72});
 
@@ -21,7 +21,8 @@ class ConfettiBurst extends StatefulWidget {
   State<ConfettiBurst> createState() => _ConfettiBurstState();
 }
 
-class _ConfettiBurstState extends State<ConfettiBurst> with SingleTickerProviderStateMixin {
+class _ConfettiBurstState extends State<ConfettiBurst>
+    with SingleTickerProviderStateMixin {
   late final _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 2600),
@@ -32,16 +33,23 @@ class _ConfettiBurstState extends State<ConfettiBurst> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    if (widget.trigger > 0) _controller.forward(from: 0);
+    if (widget.trigger > 0) _fire();
   }
 
   @override
   void didUpdateWidget(ConfettiBurst old) {
     super.didUpdateWidget(old);
-    if (old.trigger != widget.trigger) {
-      _particles = _spawn();
-      _controller.forward(from: 0);
+    if (old.trigger != widget.trigger) _fire();
+  }
+
+  void _fire() {
+    if (widget.particles <= 0) {
+      _controller.stop();
+      _particles = const [];
+      return;
     }
+    _particles = _spawn();
+    _controller.forward(from: 0);
   }
 
   List<_Particle> _spawn() {
@@ -53,6 +61,8 @@ class _ConfettiBurstState extends State<ConfettiBurst> with SingleTickerProvider
       QuadColor.yellow,
       QuadColor.purple,
       QuadColor.cyan,
+      QuadColor.orange,
+      QuadColor.magenta,
     ];
     return List.generate(widget.particles, (i) {
       final angle = -math.pi / 2 + (rng.nextDouble() - 0.5) * 2.4;
@@ -84,7 +94,10 @@ class _ConfettiBurstState extends State<ConfettiBurst> with SingleTickerProvider
         animation: _controller,
         builder: (context, _) => _controller.isAnimating
             ? CustomPaint(
-                painter: _ConfettiPainter(particles: _particles, t: _controller.value),
+                painter: _ConfettiPainter(
+                  particles: _particles,
+                  t: _controller.value,
+                ),
                 child: const SizedBox.expand(),
               )
             : const SizedBox.expand(),
@@ -135,9 +148,13 @@ class _ConfettiPainter extends CustomPainter {
       final fade = local > 0.72 ? 1 - (local - 0.72) / 0.28 : 1.0;
       if (fade <= 0) continue;
 
-      final dx = p.origin.dx * size.width + p.velocity.dx * local * size.width * 0.9;
-      final dy = p.origin.dy * size.height +
-          (p.velocity.dy * local + gravity * local * local * 0.75) * size.height * 0.9;
+      final dx =
+          p.origin.dx * size.width + p.velocity.dx * local * size.width * 0.9;
+      final dy =
+          p.origin.dy * size.height +
+          (p.velocity.dy * local + gravity * local * local * 0.75) *
+              size.height *
+              0.9;
 
       final alpha = fade.clamp(0.0, 1.0);
       fill.color = p.color.withValues(alpha: alpha);
@@ -152,9 +169,9 @@ class _ConfettiPainter extends CustomPainter {
       canvas.rotate(p.spin * local);
       canvas.translate(-p.size * 0.45, -p.size * 0.45);
 
-      final path = ShapeGeometry.unitPath(p.form).transform(
-        Matrix4.diagonal3Values(p.size, p.size, 1).storage,
-      );
+      final path = ShapeGeometry.unitPath(
+        p.form,
+      ).transform(Matrix4.diagonal3Values(p.size, p.size, 1).storage);
       canvas.drawPath(path, fill);
       canvas.drawPath(path, stroke);
       canvas.restore();
@@ -162,5 +179,6 @@ class _ConfettiPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_ConfettiPainter old) => old.t != t || old.particles != particles;
+  bool shouldRepaint(_ConfettiPainter old) =>
+      old.t != t || old.particles != particles;
 }

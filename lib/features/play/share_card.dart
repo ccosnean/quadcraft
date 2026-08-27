@@ -3,10 +3,12 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../app_providers.dart';
 import '../../core/level/level.dart';
 import '../../ui/shape_painter.dart';
 import '../../ui/theme.dart';
@@ -16,7 +18,7 @@ import '../../ui/widgets.dart';
 const Size kShareCardSize = Size(1080, 1350);
 
 /// Branded score card rendered into a PNG for sharing.
-class ShareCard extends StatelessWidget {
+class ShareCard extends ConsumerWidget {
   const ShareCard({
     super.key,
     required this.level,
@@ -29,7 +31,9 @@ class ShareCard extends StatelessWidget {
   final bool isNewBest;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = ref.watch(l10nProvider);
+    final track = ref.watch(languageProvider).usesWideTracking;
     return ColoredBox(
       color: Palette.backdropTop,
       child: Stack(
@@ -80,13 +84,13 @@ class ShareCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'LEVEL ${level.number.toString().padLeft(2, '0')}',
+                  l10n.levelNumber(level.number).toUpperCase(),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: AppTheme.body,
                     fontWeight: FontWeight.w600,
                     fontSize: 22,
-                    letterSpacing: 4,
+                    letterSpacing: track ? 4 : 0,
                     color: Palette.inkFaint,
                   ),
                 ),
@@ -129,7 +133,10 @@ class ShareCard extends StatelessWidget {
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 28),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 36,
+                    vertical: 28,
+                  ),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(28),
                     color: Palette.panelSunken.withValues(alpha: 0.92),
@@ -144,13 +151,13 @@ class ShareCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'MOVES',
+                            Text(
+                              l10n.moves.toUpperCase(),
                               style: TextStyle(
                                 fontFamily: AppTheme.body,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 18,
-                                letterSpacing: 3,
+                                letterSpacing: track ? 3 : 0,
                                 color: Palette.inkFaint,
                               ),
                             ),
@@ -178,10 +185,15 @@ class ShareCard extends StatelessWidget {
                             border: Border.all(color: Palette.brassDim),
                           ),
                           child: Text(
-                            'NEW BEST',
-                            style: AppTheme.monoDigits.copyWith(
+                            l10n.newBest.toUpperCase(),
+                            style: TextStyle(
+                              fontFamily: track
+                                  ? AppTheme.display
+                                  : AppTheme.body,
+                              fontFamilyFallback: AppTheme.fallbacks,
+                              fontWeight: FontWeight.w700,
                               fontSize: 18,
-                              letterSpacing: 2,
+                              letterSpacing: track ? 2 : 0,
                               color: Palette.brassBright,
                             ),
                           ),
@@ -191,7 +203,7 @@ class ShareCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 28),
                 Text(
-                  'Think you can beat $moves?',
+                  l10n.thinkYouCanBeat(moves),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontFamily: AppTheme.body,
@@ -221,15 +233,12 @@ Future<void> showShareScoreSheet({
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withValues(alpha: 0.62),
-    builder: (_) => _ShareScoreSheet(
-      level: level,
-      moves: moves,
-      isNewBest: isNewBest,
-    ),
+    builder: (_) =>
+        _ShareScoreSheet(level: level, moves: moves, isNewBest: isNewBest),
   );
 }
 
-class _ShareScoreSheet extends StatefulWidget {
+class _ShareScoreSheet extends ConsumerStatefulWidget {
   const _ShareScoreSheet({
     required this.level,
     required this.moves,
@@ -241,10 +250,10 @@ class _ShareScoreSheet extends StatefulWidget {
   final bool isNewBest;
 
   @override
-  State<_ShareScoreSheet> createState() => _ShareScoreSheetState();
+  ConsumerState<_ShareScoreSheet> createState() => _ShareScoreSheetState();
 }
 
-class _ShareScoreSheetState extends State<_ShareScoreSheet> {
+class _ShareScoreSheetState extends ConsumerState<_ShareScoreSheet> {
   final GlobalKey _cardKey = GlobalKey();
   bool _busy = false;
   String? _error;
@@ -257,7 +266,9 @@ class _ShareScoreSheetState extends State<_ShareScoreSheet> {
     });
 
     final box = context.findRenderObject() as RenderBox?;
-    final origin = box == null ? null : box.localToGlobal(Offset.zero) & box.size;
+    final origin = box == null
+        ? null
+        : box.localToGlobal(Offset.zero) & box.size;
 
     try {
       final boundary =
@@ -284,16 +295,20 @@ class _ShareScoreSheetState extends State<_ShareScoreSheet> {
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(file.path, mimeType: 'image/png')],
-          text:
-              'Quadcraft · Level ${widget.level.number} ${widget.level.name} · '
-              '${widget.moves} moves. Can you beat it?',
+          text: ref
+              .read(l10nProvider)
+              .shareCaption(
+                widget.level.number,
+                widget.level.name,
+                widget.moves,
+              ),
           subject: 'Quadcraft · ${widget.level.name}',
           sharePositionOrigin: origin,
         ),
       );
     } catch (_) {
       if (mounted) {
-        setState(() => _error = 'Share failed. Try again.');
+        setState(() => _error = ref.read(l10nProvider).shareFailed);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -302,8 +317,12 @@ class _ShareScoreSheetState extends State<_ShareScoreSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = ref.watch(l10nProvider);
     final maxH = MediaQuery.sizeOf(context).height * 0.92;
-    final previewW = (MediaQuery.sizeOf(context).width - 48).clamp(240.0, 360.0);
+    final previewW = (MediaQuery.sizeOf(context).width - 48).clamp(
+      240.0,
+      360.0,
+    );
     final previewH = previewW * (kShareCardSize.height / kShareCardSize.width);
 
     return Container(
@@ -336,7 +355,7 @@ class _ShareScoreSheetState extends State<_ShareScoreSheet> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Share score',
+                  l10n.shareScore,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
@@ -344,7 +363,7 @@ class _ShareScoreSheetState extends State<_ShareScoreSheet> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'A card with your clear — ready for friends.',
+                  l10n.shareScoreHint,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
@@ -379,14 +398,14 @@ class _ShareScoreSheetState extends State<_ShareScoreSheet> {
                 const SizedBox(height: 10),
                 Text(
                   _error!,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Palette.danger,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Palette.danger),
                 ),
               ],
               const SizedBox(height: 16),
               ActionButton(
-                label: _busy ? 'Preparing…' : 'Share image',
+                label: _busy ? l10n.preparing : l10n.shareImage,
                 icon: Icons.ios_share_rounded,
                 primary: true,
                 expand: true,

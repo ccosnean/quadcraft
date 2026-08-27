@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app_providers.dart';
 import '../../core/level/level.dart';
 import '../../data/progress_store.dart';
 import '../../ui/shape_painter.dart';
@@ -12,7 +14,7 @@ enum WinAction { replay, next, levels }
 
 /// Level-clear summary. Shown as a non-dismissible sheet so the run always
 /// ends with an explicit choice.
-class WinSheet extends StatelessWidget {
+class WinSheet extends ConsumerWidget {
   const WinSheet({
     super.key,
     required this.level,
@@ -25,8 +27,9 @@ class WinSheet extends StatelessWidget {
   final bool hasNext;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final text = Theme.of(context).textTheme;
+    final l10n = ref.watch(l10nProvider);
     final newBest = result.isNewBestMoves || result.isFirstClear;
 
     return Container(
@@ -61,7 +64,7 @@ class WinSheet extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Solved', style: text.titleLarge),
+                        Text(l10n.solved, style: text.titleLarge),
                         const SizedBox(height: 2),
                         Text(
                           '${level.number.toString().padLeft(2, '0')}  ${level.name}',
@@ -74,24 +77,26 @@ class WinSheet extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               _StatTile(
-                label: 'Moves',
+                label: l10n.moves,
                 value: '${result.moves}',
                 sub: result.isFirstClear
-                    ? 'Your score to beat'
-                    : 'Personal best  ${result.bestMoves}',
-                badge: result.isNewBestMoves && !result.isFirstClear ? 'New best' : null,
+                    ? l10n.yourScoreToBeat
+                    : l10n.personalBest(result.bestMoves),
+                badge: result.isNewBestMoves && !result.isFirstClear
+                    ? l10n.newBest
+                    : null,
                 highlight: newBest,
               ),
               const SizedBox(height: 12),
               Text(
                 newBest
-                    ? 'Nice run — share it and see if friends can beat ${result.moves}.'
-                    : 'Cleared in ${result.moves} moves. Best so far: ${result.bestMoves}.',
+                    ? l10n.sharePromptNew(result.moves)
+                    : l10n.sharePromptRepeat(result.moves, result.bestMoves),
                 style: text.bodySmall,
               ),
               const SizedBox(height: 20),
               ActionButton(
-                label: 'Share',
+                label: l10n.share,
                 icon: Icons.ios_share_rounded,
                 expand: true,
                 onPressed: () => showShareScoreSheet(
@@ -104,23 +109,27 @@ class WinSheet extends StatelessWidget {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  ActionButton(
-                    label: 'Replay',
-                    icon: Icons.refresh_rounded,
-                    onPressed: () => Navigator.of(context).pop(WinAction.replay),
+                  Expanded(
+                    child: ActionButton(
+                      label: l10n.replay,
+                      icon: Icons.refresh_rounded,
+                      expand: true,
+                      onPressed: () =>
+                          Navigator.of(context).pop(WinAction.replay),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: ActionButton(
-                      label: hasNext ? 'Next level' : 'All levels',
+                      label: hasNext ? l10n.nextLevel : l10n.allLevels,
                       icon: hasNext
                           ? Icons.arrow_forward_rounded
                           : Icons.grid_view_rounded,
                       primary: true,
                       expand: true,
-                      onPressed: () => Navigator.of(context).pop(
-                        hasNext ? WinAction.next : WinAction.levels,
-                      ),
+                      onPressed: () => Navigator.of(
+                        context,
+                      ).pop(hasNext ? WinAction.next : WinAction.levels),
                     ),
                   ),
                 ],
@@ -155,7 +164,9 @@ class _StatTile extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         color: Palette.panelSunken,
-        border: Border.all(color: highlight ? Palette.brassDim : Palette.hairline),
+        border: Border.all(
+          color: highlight ? Palette.brassDim : Palette.hairline,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,7 +177,10 @@ class _StatTile extends StatelessWidget {
               if (badge != null) ...[
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(6),
                     color: Palette.brass.withValues(alpha: 0.18),
@@ -175,9 +189,9 @@ class _StatTile extends StatelessWidget {
                   child: Text(
                     badge!.toUpperCase(),
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: Palette.brassBright,
-                          fontSize: 8,
-                        ),
+                      color: Palette.brassBright,
+                      fontSize: 8,
+                    ),
                   ),
                 ),
               ],

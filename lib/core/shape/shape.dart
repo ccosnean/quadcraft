@@ -8,14 +8,22 @@ enum QuadForm {
   circle('C'),
   square('S'),
   star('T'),
-  windmill('W');
+  windmill('W'),
+
+  /// Kite pointing to the outer corner. Four make a shuriken.
+  pike('P'),
+
+  /// Rounded petal pointing to the outer corner. Four make a flower.
+  leaf('L');
 
   const QuadForm(this.code);
 
   final String code;
 
-  static QuadForm fromCode(String code) =>
-      values.firstWhere((f) => f.code == code, orElse: () => throw FormatException('unknown form "$code"'));
+  static QuadForm fromCode(String code) => values.firstWhere(
+    (f) => f.code == code,
+    orElse: () => throw FormatException('unknown form "$code"'),
+  );
 }
 
 /// Paint applied to a piece. [uncolored] is the raw, unpainted material.
@@ -26,14 +34,18 @@ enum QuadColor {
   blue('b'),
   yellow('y'),
   purple('p'),
-  cyan('c');
+  cyan('c'),
+  orange('o'),
+  magenta('m');
 
   const QuadColor(this.code);
 
   final String code;
 
-  static QuadColor fromCode(String code) =>
-      values.firstWhere((c) => c.code == code, orElse: () => throw FormatException('unknown color "$code"'));
+  static QuadColor fromCode(String code) => values.firstWhere(
+    (c) => c.code == code,
+    orElse: () => throw FormatException('unknown color "$code"'),
+  );
 }
 
 /// A single stacked piece inside a quadrant.
@@ -56,7 +68,8 @@ class LayerPiece {
   }
 
   @override
-  bool operator ==(Object other) => other is LayerPiece && other.form == form && other.color == color;
+  bool operator ==(Object other) =>
+      other is LayerPiece && other.form == form && other.color == color;
 
   @override
   int get hashCode => Object.hash(form, color);
@@ -88,11 +101,14 @@ class Quadrant {
 
   static Quadrant parse(String code) {
     if (code == '-' || code.isEmpty) return empty;
-    return Quadrant([for (final part in code.split('+')) LayerPiece.parse(part)]);
+    return Quadrant([
+      for (final part in code.split('+')) LayerPiece.parse(part),
+    ]);
   }
 
   @override
-  bool operator ==(Object other) => other is Quadrant && listEquals(other.layers, layers);
+  bool operator ==(Object other) =>
+      other is Quadrant && listEquals(other.layers, layers);
 
   @override
   int get hashCode => Object.hashAll(layers);
@@ -110,13 +126,16 @@ class Quadrant {
 /// tl/tr/bl/br            corners in [Corner] order, "-" when empty
 /// Sr+Cb                  one quadrant: square-red at the bottom, circle-blue on top
 /// "Cu/Cu/-/-"            two uncoloured circles across the top
+/// "Po/Po/Po/Po"          four orange pikes — a shuriken
+/// "Lm/Lm/Lm/Lm"          four magenta leaves — a clover
 /// ```
 @immutable
 class Shape {
   Shape(Map<Corner, Quadrant> corners)
-      : corners = Map.unmodifiable({
-          for (final corner in Corner.values) corner: corners[corner] ?? Quadrant.empty,
-        });
+    : corners = Map.unmodifiable({
+        for (final corner in Corner.values)
+          corner: corners[corner] ?? Quadrant.empty,
+      });
 
   const Shape._empty() : corners = const {};
 
@@ -133,12 +152,16 @@ class Shape {
   bool get isEmpty => Corner.values.every((c) => this[c].isEmpty);
   bool get isNotEmpty => !isEmpty;
 
-  Iterable<Corner> get filledCorners => Corner.values.where((c) => this[c].isNotEmpty);
+  Iterable<Corner> get filledCorners =>
+      Corner.values.where((c) => this[c].isNotEmpty);
 
   int get pieceCount => Corner.values.fold(0, (sum, c) => sum + this[c].depth);
 
   /// Deepest quadrant stack, used for layout and layer-cap checks.
-  int get depth => Corner.values.fold(0, (max, c) => this[c].depth > max ? this[c].depth : max);
+  int get depth => Corner.values.fold(
+    0,
+    (max, c) => this[c].depth > max ? this[c].depth : max,
+  );
 
   /// Canonical identity. Two shapes look identical if and only if their ids match.
   String get id => Corner.values.map((c) => this[c].code).join('/');
@@ -149,7 +172,9 @@ class Shape {
   static Shape parse(String dsl) {
     final parts = dsl.split('/');
     if (parts.length != Corner.values.length) {
-      throw FormatException('shape needs ${Corner.values.length} quadrants, got "$dsl"');
+      throw FormatException(
+        'shape needs ${Corner.values.length} quadrants, got "$dsl"',
+      );
     }
     return Shape({
       for (var i = 0; i < parts.length; i++)
@@ -158,13 +183,22 @@ class Shape {
   }
 
   /// Convenience for authoring: the same form and colour in every quadrant.
-  static Shape uniform(QuadForm form, [QuadColor color = QuadColor.uncolored]) => Shape({
-        for (final corner in Corner.values) corner: Quadrant([LayerPiece(form, color)]),
-      });
+  static Shape uniform(
+    QuadForm form, [
+    QuadColor color = QuadColor.uncolored,
+  ]) => Shape({
+    for (final corner in Corner.values)
+      corner: Quadrant([LayerPiece(form, color)]),
+  });
 
   /// Convenience for authoring: a single piece in one quadrant.
-  static Shape single(Corner corner, QuadForm form, [QuadColor color = QuadColor.uncolored]) =>
-      Shape({corner: Quadrant([LayerPiece(form, color)])});
+  static Shape single(
+    Corner corner,
+    QuadForm form, [
+    QuadColor color = QuadColor.uncolored,
+  ]) => Shape({
+    corner: Quadrant([LayerPiece(form, color)]),
+  });
 
   @override
   bool operator ==(Object other) => other is Shape && other.id == id;

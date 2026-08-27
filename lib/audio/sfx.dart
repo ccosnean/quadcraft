@@ -28,7 +28,8 @@ class SoundBank {
   SoundBank._(this._players, {bool haptics = true}) : _hapticsEnabled = haptics;
 
   /// Makes no sound and no vibration. Used by tests.
-  factory SoundBank.silent() => SoundBank._(const {}, haptics: false)..muted = true;
+  factory SoundBank.silent() =>
+      SoundBank._(const {}, haptics: false)..muted = true;
 
   final Map<Sfx, AudioPlayer> _players;
   bool _muted = false;
@@ -65,11 +66,11 @@ class SoundBank {
   }
 
   static double _volumeFor(Sfx sfx) => switch (sfx) {
-        Sfx.win => 0.7,
-        Sfx.paint => 0.65,
-        Sfx.tap || Sfx.pickup => 0.45,
-        _ => 0.6,
-      };
+    Sfx.win => 0.7,
+    Sfx.paint => 0.65,
+    Sfx.tap || Sfx.pickup => 0.45,
+    _ => 0.6,
+  };
 
   void play(Sfx sfx) {
     _haptic(sfx.buzz);

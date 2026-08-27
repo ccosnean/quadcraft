@@ -3,6 +3,8 @@ import 'package:quadcraft/core/level/game_state.dart';
 import 'package:quadcraft/core/level/level.dart';
 import 'package:quadcraft/core/level/levels.dart';
 import 'package:quadcraft/core/shape/shape.dart';
+import 'package:quadcraft/l10n/l10n.dart';
+import 'package:quadcraft/l10n/level_briefs.dart';
 
 void main() {
   test('levels are numbered 1..n without gaps', () {
@@ -12,13 +14,39 @@ void main() {
     expect(kLevels.length, greaterThanOrEqualTo(15));
   });
 
+  test('post-tutorial sections get longer', () {
+    final sections = kLevelSections
+        .where((entry) => !entry.key.startsWith('Tutorial'))
+        .toList();
+    expect(sections.length, greaterThanOrEqualTo(2));
+    double? previousAvg;
+    for (final entry in sections) {
+      final avg =
+          entry.value.map((level) => level.parMoves).reduce((a, b) => a + b) /
+          entry.value.length;
+      if (previousAvg != null) {
+        expect(
+          avg,
+          greaterThan(previousAvg),
+          reason:
+              '${entry.key} avg par ${avg.toStringAsFixed(1)} '
+              'should exceed previous ${previousAvg.toStringAsFixed(1)}',
+        );
+      }
+      previousAvg = avg;
+    }
+  });
+
   group('every shipped level', () {
     for (final level in kLevels) {
       group('${level.number} ${level.name}', () {
         test('is solved by its reference line', () {
           final result = GameEngine.replay(level, level.solution);
-          expect(result.solved, isTrue,
-              reason: 'ended on ${result.board.id}, wanted ${level.goal.id}');
+          expect(
+            result.solved,
+            isTrue,
+            reason: 'ended on ${result.board.id}, wanted ${level.goal.id}',
+          );
           expect(result.moves, level.parMoves);
         });
 
@@ -35,9 +63,17 @@ void main() {
           for (final move in level.solution) {
             switch (move) {
               case RotateMove():
-                expect(level.canRotate, isTrue, reason: 'rotate used but not marked as taught');
+                expect(
+                  level.canRotate,
+                  isTrue,
+                  reason: 'rotate used but not marked as taught',
+                );
               case CutMove():
-                expect(level.canCut, isTrue, reason: 'cut used but not marked as taught');
+                expect(
+                  level.canCut,
+                  isTrue,
+                  reason: 'cut used but not marked as taught',
+                );
               case PaintMove(:final color):
                 expect(level.colors, contains(color));
               case StackMove():
@@ -69,7 +105,8 @@ void main() {
   });
 
   group('engine rules', () {
-    final level = levelByNumber(12);
+    // Slice: full-plate circle tray, cut taught, no green paint.
+    final level = levelByNumber(16);
 
     test('rejects a blueprint that is not in the tray', () {
       final outcome = GameEngine.apply(
@@ -82,30 +119,46 @@ void main() {
     });
 
     test('allows rotate even before the teaching accent is set', () {
-      final early = levelByNumber(3);
+      final early = levelByNumber(4);
       expect(early.canRotate, isFalse);
       var state = GameState.initial(early);
       // Give the board something to turn.
-      state = GameEngine.apply(state, StackMove(early.tray.first.id), early).state!;
+      state = GameEngine.apply(
+        state,
+        StackMove(early.tray.first.id),
+        early,
+      ).state!;
       final outcome = GameEngine.apply(state, const RotateMove(), early);
       expect(outcome.isApplied, isTrue);
     });
 
     test('rejects cut on an empty board', () {
-      final outcome = GameEngine.apply(GameState.initial(level), const CutMove(), level);
+      final outcome = GameEngine.apply(
+        GameState.initial(level),
+        const CutMove(),
+        level,
+      );
       expect(outcome.rejection, MoveRejection.boardEmpty);
     });
 
     test('cut banks both halves in the tray exactly once', () {
       var state = GameState.initial(level);
-      state = GameEngine.apply(state, const StackMove('Cu/Cu/Cu/Cu'), level).state!;
+      state = GameEngine.apply(
+        state,
+        const StackMove('Cu/Cu/Cu/Cu'),
+        level,
+      ).state!;
       final outcome = GameEngine.apply(state, const CutMove(), level);
       expect(outcome.discovered.map((s) => s.id), ['Cu/Cu/-/-', '-/-/Cu/Cu']);
       expect(outcome.state!.board.isEmpty, isTrue);
       expect(outcome.state!.tray.length, 3);
 
       // Cutting the same shape again must not duplicate tray entries.
-      var again = GameEngine.apply(outcome.state!, const StackMove('Cu/Cu/Cu/Cu'), level).state!;
+      var again = GameEngine.apply(
+        outcome.state!,
+        const StackMove('Cu/Cu/Cu/Cu'),
+        level,
+      ).state!;
       again = GameEngine.apply(again, const CutMove(), level).state!;
       expect(again.tray.length, 3);
     });
@@ -113,11 +166,35 @@ void main() {
     test('counts one move per accepted action', () {
       var state = GameState.initial(level);
       expect(state.moves, 0);
-      state = GameEngine.apply(state, const StackMove('Cu/Cu/Cu/Cu'), level).state!;
+      state = GameEngine.apply(
+        state,
+        const StackMove('Cu/Cu/Cu/Cu'),
+        level,
+      ).state!;
       expect(state.moves, 1);
-      final rejected = GameEngine.apply(state, const PaintMove(QuadColor.green), level);
+      final rejected = GameEngine.apply(
+        state,
+        const PaintMove(QuadColor.green),
+        level,
+      );
       expect(rejected.state, isNull);
       expect(state.moves, 1);
     });
+  });
+
+  test('every non-English UI language has a brief for every level', () {
+    final numbers = {for (final level in kLevels) level.number};
+    final localized = AppLanguage.values.where((l) => l != AppLanguage.en);
+    expect(kLevelBriefs.keys.toSet(), {
+      for (final language in localized) language.code,
+    });
+    for (final language in localized) {
+      final briefs = kLevelBriefs[language.code]!;
+      expect(briefs.keys.toSet(), numbers, reason: language.code);
+      for (final level in kLevels) {
+        expect(briefs[level.number]!.trim(), isNotEmpty, reason: language.code);
+        expect(briefs[level.number], isNot(level.brief), reason: language.code);
+      }
+    }
   });
 }

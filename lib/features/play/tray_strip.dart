@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app_providers.dart';
 import '../../core/shape/shape.dart';
 import '../../ui/shape_painter.dart';
 import '../../ui/theme.dart';
@@ -15,7 +17,7 @@ typedef TrayColorTap = void Function(QuadColor color, Rect globalOrigin);
 
 /// Bottom tray: reusable blueprints and paints. Tap places; the list scrolls
 /// freely with no drag competing for the gesture.
-class TrayStrip extends StatelessWidget {
+class TrayStrip extends ConsumerWidget {
   const TrayStrip({
     super.key,
     required this.shapes,
@@ -38,7 +40,8 @@ class TrayStrip extends StatelessWidget {
   final bool enabled;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = ref.watch(l10nProvider);
     return Panel(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       child: Column(
@@ -46,10 +49,10 @@ class TrayStrip extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Overline('Blueprints'),
+              Overline(l10n.blueprints),
               const Spacer(),
               Overline(
-                'tap to place',
+                l10n.tapToPlace,
                 color: Palette.inkFaint.withValues(alpha: 0.8),
               ),
             ],
@@ -81,7 +84,7 @@ class TrayStrip extends StatelessWidget {
             ),
           if (colors.isNotEmpty) ...[
             const SizedBox(height: 14),
-            const Overline('Paint'),
+            Overline(l10n.paint),
             const SizedBox(height: 10),
             SizedBox(
               height: 52,
@@ -107,18 +110,18 @@ class TrayStrip extends StatelessWidget {
   }
 }
 
-class _EmptyTrayHint extends StatelessWidget {
+class _EmptyTrayHint extends ConsumerWidget {
   const _EmptyTrayHint();
 
   @override
-  Widget build(BuildContext context) => Container(
-        height: 78,
-        alignment: Alignment.center,
-        child: Text(
-          'No blueprints. Work with what is on the plate.',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-      );
+  Widget build(BuildContext context, WidgetRef ref) => Container(
+    height: 78,
+    alignment: Alignment.center,
+    child: Text(
+      ref.watch(l10nProvider).emptyTray,
+      style: Theme.of(context).textTheme.bodySmall,
+    ),
+  );
 }
 
 Rect? _globalBoundsOf(BuildContext context) {
@@ -127,7 +130,7 @@ Rect? _globalBoundsOf(BuildContext context) {
   return box.localToGlobal(Offset.zero) & box.size;
 }
 
-class _ShapeChip extends StatelessWidget {
+class _ShapeChip extends ConsumerWidget {
   const _ShapeChip({
     required this.shape,
     required this.blocked,
@@ -141,7 +144,7 @@ class _ShapeChip extends StatelessWidget {
   final ValueChanged<Rect> onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final well = Opacity(
       opacity: blocked ? 0.4 : 1,
       child: AspectRatio(
@@ -162,7 +165,7 @@ class _ShapeChip extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: enabled && !blocked,
-      label: 'Blueprint ${shape.id}',
+      label: ref.watch(l10nProvider).blueprintLabel(shape.id),
       child: SizedBox(
         width: 78,
         child: Material(
@@ -183,7 +186,7 @@ class _ShapeChip extends StatelessWidget {
   }
 }
 
-class _ColorChip extends StatelessWidget {
+class _ColorChip extends ConsumerWidget {
   const _ColorChip({
     required this.color,
     required this.enabled,
@@ -195,12 +198,13 @@ class _ColorChip extends StatelessWidget {
   final ValueChanged<Rect> onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = ref.watch(l10nProvider);
     final swatch = _Swatch(color: color, diameter: 48);
     return Semantics(
       button: true,
       enabled: enabled,
-      label: '${Palette.label(color)} paint',
+      label: l10n.paintLabel(l10n.colorName(color)),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -291,6 +295,9 @@ Future<void> flyToBoard({
   required Rect to,
   required Widget child,
   Duration duration = const Duration(milliseconds: 320),
+  bool fadeOut = true,
+  double lift = 36,
+  double midScale = 1.15,
 }) {
   final overlay = Overlay.maybeOf(context, rootOverlay: true);
   if (overlay == null) return Future.value();
@@ -302,6 +309,9 @@ Future<void> flyToBoard({
       from: from,
       to: to,
       duration: duration,
+      fadeOut: fadeOut,
+      lift: lift,
+      midScale: midScale,
       onDone: () {
         entry.remove();
         if (!completer.isCompleted) completer.complete();
@@ -318,6 +328,9 @@ class _FlightLayer extends StatefulWidget {
     required this.from,
     required this.to,
     required this.duration,
+    required this.fadeOut,
+    required this.lift,
+    required this.midScale,
     required this.onDone,
     required this.child,
   });
@@ -325,6 +338,9 @@ class _FlightLayer extends StatefulWidget {
   final Rect from;
   final Rect to;
   final Duration duration;
+  final bool fadeOut;
+  final double lift;
+  final double midScale;
   final VoidCallback onDone;
   final Widget child;
 
@@ -363,10 +379,16 @@ class _FlightLayerState extends State<_FlightLayer>
         builder: (context, child) {
           final t = motion.value;
           // Slight arc upward mid-flight.
-          final lift = (1 - (2 * t - 1).abs()) * 36;
+          final lift = (1 - (2 * t - 1).abs()) * widget.lift;
           final rect = Rect.lerp(widget.from, widget.to, t)!;
-          final scale = lerpDouble(1.0, 1.15, (1 - (2 * t - 1).abs()))!;
-          final opacity = t < 0.85 ? 1.0 : (1 - (t - 0.85) / 0.15);
+          final scale = lerpDouble(
+            1.0,
+            widget.midScale,
+            (1 - (2 * t - 1).abs()),
+          )!;
+          final opacity = widget.fadeOut && t > 0.85
+              ? (1 - (t - 0.85) / 0.15)
+              : 1.0;
 
           return Stack(
             children: [
@@ -383,7 +405,9 @@ class _FlightLayerState extends State<_FlightLayer>
                       decoration: BoxDecoration(
                         boxShadow: [
                           BoxShadow(
-                            color: Palette.brass.withValues(alpha: 0.22 * opacity),
+                            color: Palette.brass.withValues(
+                              alpha: 0.22 * opacity,
+                            ),
                             blurRadius: 28,
                             spreadRadius: 2,
                           ),

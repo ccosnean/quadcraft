@@ -10,6 +10,9 @@ import '../../core/shape/shape.dart';
 import '../../core/shape/shape_ops.dart';
 import '../../data/progress_store.dart';
 
+/// Hints you may take while playing a level. Survives reset, not a re-entry.
+const kMaxHintsPerLevel = 3;
+
 /// Transient thing that just happened on the board, consumed by the view to
 /// run an animation. Never affects rules.
 @immutable
@@ -69,14 +72,14 @@ class PlayState {
   });
 
   factory PlayState.fresh(Level level) => PlayState(
-        level: level,
-        game: GameState.initial(level),
-        history: const [],
-        effect: null,
-        effectId: 0,
-        clear: null,
-        hintsUsed: 0,
-      );
+    level: level,
+    game: GameState.initial(level),
+    history: const [],
+    effect: null,
+    effectId: 0,
+    clear: null,
+    hintsUsed: 0,
+  );
 
   final Level level;
   final GameState game;
@@ -95,6 +98,15 @@ class PlayState {
   bool get solved => game.solved;
   bool get canUndo => history.isNotEmpty && !solved;
 
+  /// Hints left on this attempt. Reset keeps the spend so you cannot refill.
+  int get hintsRemaining =>
+      (kMaxHintsPerLevel - hintsUsed).clamp(0, kMaxHintsPerLevel);
+
+  bool get canHint => !solved && hintsRemaining > 0;
+
+  /// Real actions plus one per hint. What the HUD and the clear record use.
+  int get scoredMoves => game.moves + hintsUsed;
+
   PlayState copyWith({
     GameState? game,
     List<GameState>? history,
@@ -102,21 +114,21 @@ class PlayState {
     int? effectId,
     ClearResult? clear,
     int? hintsUsed,
-  }) =>
-      PlayState(
-        level: level,
-        game: game ?? this.game,
-        history: history ?? this.history,
-        effect: effect ?? this.effect,
-        effectId: effectId ?? this.effectId,
-        clear: clear ?? this.clear,
-        hintsUsed: hintsUsed ?? this.hintsUsed,
-      );
+  }) => PlayState(
+    level: level,
+    game: game ?? this.game,
+    history: history ?? this.history,
+    effect: effect ?? this.effect,
+    effectId: effectId ?? this.effectId,
+    clear: clear ?? this.clear,
+    hintsUsed: hintsUsed ?? this.hintsUsed,
+  );
 }
 
 class PlayController extends AutoDisposeFamilyNotifier<PlayState, int> {
   @override
-  PlayState build(int levelNumber) => PlayState.fresh(levelByNumber(levelNumber));
+  PlayState build(int levelNumber) =>
+      PlayState.fresh(levelByNumber(levelNumber));
 
   SoundBank get _sound => ref.read(soundBankProvider);
 
@@ -132,7 +144,8 @@ class PlayController extends AutoDisposeFamilyNotifier<PlayState, int> {
     _run(StackMove(blueprint.id), StackedEffect(touched), Sfx.drop);
   }
 
-  void paint(QuadColor color) => _run(PaintMove(color), PaintedEffect(color), Sfx.paint);
+  void paint(QuadColor color) =>
+      _run(PaintMove(color), PaintedEffect(color), Sfx.paint);
 
   void _run(GameMove move, BoardEffect effect, Sfx sound) {
     if (state.solved) return;
@@ -160,10 +173,9 @@ class PlayController extends AutoDisposeFamilyNotifier<PlayState, int> {
   }
 
   void _finish() {
-    final clear = ref.read(progressProvider.notifier).recordClear(
-          levelNumber: state.level.number,
-          moves: state.game.moves,
-        );
+    final clear = ref
+        .read(progressProvider.notifier)
+        .recordClear(levelNumber: state.level.number, moves: state.scoredMoves);
     _sound.play(Sfx.win);
     state = state.copyWith(
       clear: clear,
@@ -199,7 +211,13 @@ class PlayController extends AutoDisposeFamilyNotifier<PlayState, int> {
 
   /// Reveals the next step of the authored solution, replayed against the
   /// player's current position when it still matches the reference line.
+  /// Costs one scored move. Capped at [kMaxHintsPerLevel] per attempt.
   GameMove? revealHint() {
+    if (!state.canHint) {
+      _sound.play(Sfx.blocked);
+      return null;
+    }
+
     final solution = state.level.solution;
     final index = state.game.moves;
     if (index >= solution.length) return null;
@@ -214,5 +232,5 @@ class PlayController extends AutoDisposeFamilyNotifier<PlayState, int> {
   }
 }
 
-final playControllerProvider =
-    NotifierProvider.autoDispose.family<PlayController, PlayState, int>(PlayController.new);
+final playControllerProvider = NotifierProvider.autoDispose
+    .family<PlayController, PlayState, int>(PlayController.new);

@@ -135,7 +135,9 @@ class _BoardStageState extends State<BoardStage> with TickerProviderStateMixin {
             scale: pop,
             child: Plate(
               glow: glow,
-              glowColor: solvePulse > widget.dropGlow ? Palette.brassBright : widget.dropGlowColor,
+              glowColor: solvePulse > widget.dropGlow
+                  ? Palette.brassBright
+                  : widget.dropGlowColor,
               child: SizedBox(
                 width: size,
                 height: size,
@@ -226,7 +228,8 @@ class _RipplePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_RipplePainter old) => old.progress != progress || old.color != color;
+  bool shouldRepaint(_RipplePainter old) =>
+      old.progress != progress || old.color != color;
 }
 
 /// Bright seam that sweeps across the plate at the moment of the cut.

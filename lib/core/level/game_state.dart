@@ -17,12 +17,14 @@ enum MoveRejection {
 @immutable
 class MoveOutcome {
   const MoveOutcome.applied(this.state, {this.discovered = const <Shape>[]})
-      : rejection = null,
-        blockedCorners = const <Corner>{};
+    : rejection = null,
+      blockedCorners = const <Corner>{};
 
-  const MoveOutcome.rejected(this.rejection, {this.blockedCorners = const <Corner>{}})
-      : state = null,
-        discovered = const <Shape>[];
+  const MoveOutcome.rejected(
+    this.rejection, {
+    this.blockedCorners = const <Corner>{},
+  }) : state = null,
+       discovered = const <Shape>[];
 
   final GameState? state;
   final MoveRejection? rejection;
@@ -47,11 +49,11 @@ class GameState {
   });
 
   factory GameState.initial(Level level) => GameState(
-        board: level.start,
-        tray: List.unmodifiable(_dedupe(level.tray)),
-        moves: 0,
-        solved: ShapeOps.shapesEqual(level.start, level.goal),
-      );
+    board: level.start,
+    tray: List.unmodifiable(_dedupe(level.tray)),
+    moves: 0,
+    solved: ShapeOps.shapesEqual(level.start, level.goal),
+  );
 
   final Shape board;
 
@@ -61,12 +63,17 @@ class GameState {
   final int moves;
   final bool solved;
 
-  GameState copyWith({Shape? board, List<Shape>? tray, int? moves, bool? solved}) => GameState(
-        board: board ?? this.board,
-        tray: tray == null ? this.tray : List.unmodifiable(tray),
-        moves: moves ?? this.moves,
-        solved: solved ?? this.solved,
-      );
+  GameState copyWith({
+    Shape? board,
+    List<Shape>? tray,
+    int? moves,
+    bool? solved,
+  }) => GameState(
+    board: board ?? this.board,
+    tray: tray == null ? this.tray : List.unmodifiable(tray),
+    moves: moves ?? this.moves,
+    solved: solved ?? this.solved,
+  );
 
   static List<Shape> _dedupe(Iterable<Shape> shapes) {
     final seen = <String>{};
@@ -87,15 +94,18 @@ abstract final class GameEngine {
       case RotateMove():
         // Turn and cut stay available on every level; early puzzles simply
         // teach them one at a time through goals and briefs.
-        if (state.board.isEmpty) return const MoveOutcome.rejected(MoveRejection.boardEmpty);
+        if (state.board.isEmpty)
+          return const MoveOutcome.rejected(MoveRejection.boardEmpty);
         return _commit(state, level, ShapeOps.rotateClockwise(state.board));
 
       case CutMove():
-        if (state.board.isEmpty) return const MoveOutcome.rejected(MoveRejection.boardEmpty);
+        if (state.board.isEmpty)
+          return const MoveOutcome.rejected(MoveRejection.boardEmpty);
         final halves = ShapeOps.cutHorizontal(state.board);
         final discovered = <Shape>[
           for (final half in [halves.top, halves.bottom])
-            if (half.isNotEmpty && !state.tray.any((t) => t.id == half.id)) half,
+            if (half.isNotEmpty && !state.tray.any((t) => t.id == half.id))
+              half,
         ];
         return _commit(
           state,
@@ -113,7 +123,10 @@ abstract final class GameEngine {
         final blueprint = matches.first;
         final overflow = ShapeOps.overflowingCorners(state.board, blueprint);
         if (overflow.isNotEmpty) {
-          return MoveOutcome.rejected(MoveRejection.layerLimit, blockedCorners: overflow);
+          return MoveOutcome.rejected(
+            MoveRejection.layerLimit,
+            blockedCorners: overflow,
+          );
         }
         return _commit(state, level, ShapeOps.stack(state.board, blueprint));
 
@@ -121,7 +134,8 @@ abstract final class GameEngine {
         if (!level.colors.contains(color)) {
           return const MoveOutcome.rejected(MoveRejection.notAllowed);
         }
-        if (state.board.isEmpty) return const MoveOutcome.rejected(MoveRejection.boardEmpty);
+        if (state.board.isEmpty)
+          return const MoveOutcome.rejected(MoveRejection.boardEmpty);
         if (!ShapeOps.canPaint(state.board, color)) {
           return const MoveOutcome.rejected(MoveRejection.nothingToPaint);
         }

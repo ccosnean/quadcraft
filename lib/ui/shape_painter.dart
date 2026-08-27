@@ -14,7 +14,7 @@ import 'theme.dart';
 ///
 /// Every form meets the shared plate origin and the two radial axes, so four
 /// matching quarters combine into one continuous silhouette (disk, square,
-/// star, windmill) with only a thin outline between pieces.
+/// star, windmill, shuriken, flower) with only a thin outline between pieces.
 abstract final class ShapeGeometry {
   /// Radius as a fraction of half the widget size. Leaves room for square and
   /// windmill quadrants, whose corners reach past the circle's radius.
@@ -25,7 +25,7 @@ abstract final class ShapeGeometry {
   static const double layerFalloff = 0.72;
 
   /// Outline width in unit space (path is scaled by piece radius).
-  static const double outlineWidth = 0.026;
+  static const double outlineWidth = 0.045;
 
   /// Slight oversize so abutting fills hide the guide crosshair under AA.
   static const double fillBleed = 1.01;
@@ -80,6 +80,22 @@ abstract final class ShapeGeometry {
           ..lineTo(1, 0)
           ..lineTo(1, 0.52)
           ..lineTo(0, 1)
+          ..close();
+      case QuadForm.pike:
+        // Blade to the outer corner. Four copies make a four-point shuriken.
+        return Path()
+          ..moveTo(0, 0)
+          ..lineTo(0.46, 0)
+          ..lineTo(1, 1)
+          ..lineTo(0, 0.46)
+          ..close();
+      case QuadForm.leaf:
+        // Rounded petal to the outer corner. Four copies make a clover.
+        return Path()
+          ..moveTo(0, 0)
+          ..lineTo(0.62, 0)
+          ..quadraticBezierTo(1.08, 0.22, 1, 1)
+          ..quadraticBezierTo(0.22, 1.08, 0, 0.62)
           ..close();
     }
   }
@@ -202,11 +218,18 @@ class ShapePainter extends CustomPainter {
 
     if (form == QuadForm.circle) {
       canvas.drawLine(
-        Offset(-1, 0),
         Offset(1, 0),
+        Offset(0, 0),
         _outline
           ..strokeWidth = outlineWidth
-          ..color = const Color(0xFF0A1116).withValues(alpha: 0.5 * opacity),
+          ..color = const Color(0xFF0A1116),
+      );
+      canvas.drawLine(
+        Offset(0, 0),
+        Offset(0, 1),
+        _outline
+          ..strokeWidth = outlineWidth
+          ..color = const Color(0xFF0A1116),
       );
       canvas.drawArc(
         Rect.fromCircle(center: Offset.zero, radius: 1),
@@ -215,14 +238,14 @@ class ShapePainter extends CustomPainter {
         false,
         _outline
           ..strokeWidth = outlineWidth
-          ..color = const Color(0xFF0A1116).withValues(alpha: 0.5 * opacity),
+          ..color = const Color(0xFF0A1116),
       );
     } else {
       canvas.drawPath(
         ShapeGeometry.unitPath(form),
         _outline
           ..strokeWidth = outlineWidth
-          ..color = const Color(0xFF0A1116).withValues(alpha: 0.5 * opacity),
+          ..color = const Color(0xFF0A1116),
       );
     }
 

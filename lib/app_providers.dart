@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'audio/sfx.dart';
 import 'core/level/levels.dart';
 import 'data/progress_store.dart';
+import 'l10n/l10n.dart';
 
 /// Overridden in `main()` once local progress is loaded.
 final progressStoreProvider = Provider<ProgressRepository>(
@@ -37,7 +38,9 @@ class ProgressNotifier extends Notifier<ProgressSnapshot> {
   ProgressSnapshot _read() {
     final store = ref.read(progressStoreProvider);
     return ProgressSnapshot(
-      records: {for (final record in store.allRecords()) record.levelNumber: record},
+      records: {
+        for (final record in store.allRecords()) record.levelNumber: record,
+      },
       unlocked: store.highestUnlocked(kLevels.length),
     );
   }
@@ -52,11 +55,16 @@ class ProgressNotifier extends Notifier<ProgressSnapshot> {
   void resetProgress() {
     ref.read(progressStoreProvider).resetAll();
     state = _read();
+    ref.invalidate(mutedProvider);
+    ref.invalidate(confettiProvider);
+    ref.invalidate(targetPreviewProvider);
+    ref.invalidate(languageProvider);
   }
 }
 
-final progressProvider =
-    NotifierProvider<ProgressNotifier, ProgressSnapshot>(ProgressNotifier.new);
+final progressProvider = NotifierProvider<ProgressNotifier, ProgressSnapshot>(
+  ProgressNotifier.new,
+);
 
 class MutedNotifier extends Notifier<bool> {
   @override
@@ -76,3 +84,49 @@ class MutedNotifier extends Notifier<bool> {
 }
 
 final mutedProvider = NotifierProvider<MutedNotifier, bool>(MutedNotifier.new);
+
+class ConfettiNotifier extends Notifier<ConfettiAmount> {
+  @override
+  ConfettiAmount build() => ref.read(progressStoreProvider).confetti;
+
+  void set(ConfettiAmount value) {
+    ref.read(progressStoreProvider).confetti = value;
+    state = value;
+  }
+}
+
+final confettiProvider = NotifierProvider<ConfettiNotifier, ConfettiAmount>(
+  ConfettiNotifier.new,
+);
+
+class TargetPreviewNotifier extends Notifier<TargetPreviewMode> {
+  @override
+  TargetPreviewMode build() => ref.read(progressStoreProvider).targetPreview;
+
+  void set(TargetPreviewMode value) {
+    ref.read(progressStoreProvider).targetPreview = value;
+    state = value;
+  }
+}
+
+final targetPreviewProvider =
+    NotifierProvider<TargetPreviewNotifier, TargetPreviewMode>(
+      TargetPreviewNotifier.new,
+    );
+
+class LanguageNotifier extends Notifier<AppLanguage> {
+  @override
+  AppLanguage build() =>
+      AppLanguage.fromCode(ref.read(progressStoreProvider).languageCode);
+
+  void set(AppLanguage language) {
+    ref.read(progressStoreProvider).languageCode = language.code;
+    state = language;
+  }
+}
+
+final languageProvider = NotifierProvider<LanguageNotifier, AppLanguage>(
+  LanguageNotifier.new,
+);
+
+final l10nProvider = Provider<L10n>((ref) => L10n(ref.watch(languageProvider)));

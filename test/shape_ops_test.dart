@@ -11,6 +11,8 @@ void main() {
         'Cu/Cu/Cu/Cu',
         'Su+Cu/-/-/-',
         'Wu+Tu+Su+Cr/Cb/-/Ty',
+        'Po/Po/Po/Po',
+        'Lm+Cr/Lm+Cr/Lm+Cr/Lm+Cr',
       ];
       for (final id in ids) {
         expect(Shape.parse(id).id, id);
@@ -26,7 +28,10 @@ void main() {
     });
 
     test('equality is structural', () {
-      expect(Shape.parse('Cr/-/-/-'), Shape.single(Corner.tl, QuadForm.circle, QuadColor.red));
+      expect(
+        Shape.parse('Cr/-/-/-'),
+        Shape.single(Corner.tl, QuadForm.circle, QuadColor.red),
+      );
       expect(Shape.parse('Cr/-/-/-') == Shape.parse('Cb/-/-/-'), isFalse);
       expect(Shape.uniform(QuadForm.square).id, 'Su/Su/Su/Su');
     });
@@ -64,11 +69,17 @@ void main() {
 
     test('counter-clockwise undoes clockwise', () {
       final start = Shape.parse('Su/Cr/Tb/-');
-      expect(ShapeOps.rotateCounterClockwise(ShapeOps.rotateClockwise(start)).id, start.id);
+      expect(
+        ShapeOps.rotateCounterClockwise(ShapeOps.rotateClockwise(start)).id,
+        start.id,
+      );
     });
 
     test('preserves layer order inside a quadrant', () {
-      expect(ShapeOps.rotateClockwise(Shape.parse('Su+Cu/-/-/-')).id, '-/Su+Cu/-/-');
+      expect(
+        ShapeOps.rotateClockwise(Shape.parse('Su+Cu/-/-/-')).id,
+        '-/Su+Cu/-/-',
+      );
     });
   });
 
@@ -94,12 +105,18 @@ void main() {
 
   group('stack', () {
     test('fills empty quadrants', () {
-      final result = ShapeOps.stack(Shape.parse('Cu/-/-/-'), Shape.parse('-/Su/-/-'));
+      final result = ShapeOps.stack(
+        Shape.parse('Cu/-/-/-'),
+        Shape.parse('-/Su/-/-'),
+      );
       expect(result.id, 'Cu/Su/-/-');
     });
 
     test('incoming piece lands under the existing stack', () {
-      final result = ShapeOps.stack(Shape.parse('Cu/-/-/-'), Shape.parse('Su/-/-/-'));
+      final result = ShapeOps.stack(
+        Shape.parse('Cu/-/-/-'),
+        Shape.parse('Su/-/-/-'),
+      );
       expect(result.id, 'Su+Cu/-/-/-');
       expect(result[Corner.tl].layers.first.form, QuadForm.square);
       expect(result[Corner.tl].layers.last.form, QuadForm.circle);
@@ -117,17 +134,19 @@ void main() {
     test('refuses a drop that would exceed the layer cap', () {
       final full = Shape.parse('Wu+Tu+Su+Cu/-/-/-');
       expect(ShapeOps.canStack(full, Shape.parse('Cu/-/-/-')), isFalse);
-      expect(ShapeOps.overflowingCorners(full, Shape.parse('Cu/-/-/-')), {Corner.tl});
+      expect(ShapeOps.overflowingCorners(full, Shape.parse('Cu/-/-/-')), {
+        Corner.tl,
+      });
       // A drop that misses the full quadrant is still fine.
       expect(ShapeOps.canStack(full, Shape.parse('-/Cu/-/-')), isTrue);
     });
 
     test('reports every overflowing quadrant', () {
       final board = Shape.parse('Wu+Tu+Su+Cu/Wu+Tu+Su+Cu/-/-');
-      expect(
-        ShapeOps.overflowingCorners(board, Shape.parse('Cu/Cu/Cu/-')),
-        {Corner.tl, Corner.tr},
-      );
+      expect(ShapeOps.overflowingCorners(board, Shape.parse('Cu/Cu/Cu/-')), {
+        Corner.tl,
+        Corner.tr,
+      });
     });
 
     test('an empty blueprint is not a legal drop', () {
@@ -155,13 +174,24 @@ void main() {
     });
 
     test('overwrites mixed colours uniformly', () {
-      expect(ShapeOps.paintAll(Shape.parse('Cb+Cr/Ty/-/-'), QuadColor.green).id, 'Cg+Cg/Tg/-/-');
+      expect(
+        ShapeOps.paintAll(Shape.parse('Cb+Cr/Ty/-/-'), QuadColor.green).id,
+        'Cg+Cg/Tg/-/-',
+      );
     });
   });
 
   test('shapesEqual compares canonical ids', () {
-    expect(ShapeOps.shapesEqual(Shape.parse('Cu/-/-/-'), Shape.single(Corner.tl, QuadForm.circle)),
-        isTrue);
-    expect(ShapeOps.shapesEqual(Shape.parse('Cu/-/-/-'), Shape.parse('-/Cu/-/-')), isFalse);
+    expect(
+      ShapeOps.shapesEqual(
+        Shape.parse('Cu/-/-/-'),
+        Shape.single(Corner.tl, QuadForm.circle),
+      ),
+      isTrue,
+    );
+    expect(
+      ShapeOps.shapesEqual(Shape.parse('Cu/-/-/-'), Shape.parse('-/Cu/-/-')),
+      isFalse,
+    );
   });
 }

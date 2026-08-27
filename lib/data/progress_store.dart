@@ -5,32 +5,11 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-/// Best result recorded for one level.
-class LevelRecord {
-  LevelRecord({
-    required this.levelNumber,
-    required this.bestMoves,
-    this.clears = 1,
-  });
+import '../l10n/l10n.dart';
+import '../objectbox.g.dart';
+import 'entities.dart';
 
-  factory LevelRecord.fromJson(Map<String, dynamic> json) => LevelRecord(
-        levelNumber: json['levelNumber'] as int,
-        bestMoves: json['bestMoves'] as int,
-        clears: json['clears'] as int? ?? 1,
-      );
-
-  int levelNumber;
-  int bestMoves;
-
-  /// How many times the level has been completed.
-  int clears;
-
-  Map<String, Object> toJson() => {
-        'levelNumber': levelNumber,
-        'bestMoves': bestMoves,
-        'clears': clears,
-      };
-}
+export 'entities.dart';
 
 /// Result of finishing a level, used to drive the win sheet.
 class ClearResult {
@@ -47,6 +26,47 @@ class ClearResult {
   final bool isFirstClear;
 }
 
+/// How many pieces fly when a level is solved.
+enum ConfettiAmount {
+  full,
+  reduced,
+  off;
+
+  static ConfettiAmount fromStored({String? code, bool reducedFlag = false}) {
+    return switch (code) {
+      'reduced' => ConfettiAmount.reduced,
+      'off' => ConfettiAmount.off,
+      'full' => ConfettiAmount.full,
+      _ => reducedFlag ? ConfettiAmount.reduced : ConfettiAmount.full,
+    };
+  }
+
+  /// Particle count used by the win-burst overlay.
+  int get particles => switch (this) {
+    ConfettiAmount.full => 72,
+    ConfettiAmount.reduced => 18,
+    ConfettiAmount.off => 0,
+  };
+}
+
+/// How the large target preview behaves when a level opens.
+enum TargetPreviewMode {
+  /// Skip the overlay; the HUD chip is already in place.
+  off,
+
+  /// Show the overlay, then fly it into the HUD on its own.
+  auto,
+
+  /// Show the overlay until the player taps.
+  manual;
+
+  static TargetPreviewMode fromStored(String? code) => switch (code) {
+    'off' => TargetPreviewMode.off,
+    'manual' => TargetPreviewMode.manual,
+    _ => TargetPreviewMode.auto,
+  };
+}
+
 /// Storage contract used by the app. Keeping it abstract lets the game fall
 /// back to memory if the file cannot be opened, and lets tests run without
 /// touching disk.
@@ -57,30 +77,45 @@ abstract interface class ProgressRepository {
 
   int highestUnlocked(int levelCount);
 
-  ClearResult recordClear({
-    required int levelNumber,
-    required int moves,
-  });
+  ClearResult recordClear({required int levelNumber, required int moves});
 
   bool get muted;
 
   set muted(bool value);
 
+  ConfettiAmount get confetti;
+
+  set confetti(ConfettiAmount value);
+
+  String get languageCode;
+
+  set languageCode(String value);
+
+  TargetPreviewMode get targetPreview;
+
+  set targetPreview(TargetPreviewMode value);
+
+  /// Wipes solved levels and restores default settings.
   void resetAll();
 }
 
-/// Local, offline progress stored as a single JSON file.
+/// Local, offline progress stored in ObjectBox.
 class ProgressStore implements ProgressRepository {
-  ProgressStore(this._file) {
-    _load();
+  ProgressStore(this.store) {
+    _prefs();
   }
 
-  /// Opens the on-device save file, falling back to an in-memory store so a
+  /// Opens the on-device database, falling back to an in-memory store so a
   /// storage failure costs the player their history but never the game.
   static Future<ProgressRepository> open() async {
     try {
       final dir = await getApplicationDocumentsDirectory();
-      return ProgressStore(File(p.join(dir.path, 'quadcraft-progress.json')));
+      final store = await openStore(
+        directory: p.join(dir.path, 'quadcraft-objectbox'),
+      );
+      final progress = ProgressStore(store);
+      progress._migrateJsonIfNeeded(dir);
+      return progress;
     } catch (error, stack) {
       debugPrint('quadcraft: falling back to in-memory progress ($error)');
       debugPrintStack(stackTrace: stack, maxFrames: 6);
@@ -88,77 +123,133 @@ class ProgressStore implements ProgressRepository {
     }
   }
 
-  final File _file;
-  final Map<int, LevelRecord> _records = {};
-  bool _muted = false;
+  final Store store;
+
+  Box<LevelRecord> get _levels => store.box<LevelRecord>();
+  Box<AppPrefs> get _prefsBox => store.box<AppPrefs>();
 
   @override
-  LevelRecord? recordFor(int levelNumber) => _records[levelNumber];
+  LevelRecord? recordFor(int levelNumber) {
+    final query = _levels
+        .query(LevelRecord_.levelNumber.equals(levelNumber))
+        .build();
+    try {
+      return query.findFirst();
+    } finally {
+      query.close();
+    }
+  }
 
   @override
-  List<LevelRecord> allRecords() => _records.values.toList();
+  List<LevelRecord> allRecords() => _levels.getAll();
 
   @override
   int highestUnlocked(int levelCount) => firstUnsolved(levelCount, recordFor);
 
   @override
-  ClearResult recordClear({
-    required int levelNumber,
-    required int moves,
-  }) {
+  ClearResult recordClear({required int levelNumber, required int moves}) {
     final merged = mergeClear(
       existing: recordFor(levelNumber),
       levelNumber: levelNumber,
       moves: moves,
     );
-    _records[levelNumber] = merged.record;
-    _save();
+    _levels.put(merged.record);
     return merged.result;
   }
 
   @override
-  bool get muted => _muted;
+  bool get muted => _prefs().muted;
 
   @override
   set muted(bool value) {
-    _muted = value;
-    _save();
+    final prefs = _prefs()..muted = value;
+    _prefsBox.put(prefs);
+  }
+
+  @override
+  ConfettiAmount get confetti =>
+      ConfettiAmount.fromStored(code: _prefs().confetti);
+
+  @override
+  set confetti(ConfettiAmount value) {
+    final prefs = _prefs()..confetti = value.name;
+    _prefsBox.put(prefs);
+  }
+
+  @override
+  String get languageCode => _prefs().language;
+
+  @override
+  set languageCode(String value) {
+    final prefs = _prefs()..language = value;
+    _prefsBox.put(prefs);
+  }
+
+  @override
+  TargetPreviewMode get targetPreview =>
+      TargetPreviewMode.fromStored(_prefs().targetPreview);
+
+  @override
+  set targetPreview(TargetPreviewMode value) {
+    final prefs = _prefs()..targetPreview = value.name;
+    _prefsBox.put(prefs);
   }
 
   @override
   void resetAll() {
-    _records.clear();
-    _muted = false;
-    _save();
+    _levels.removeAll();
+    final prefs = _prefs()
+      ..muted = false
+      ..confetti = ConfettiAmount.full.name
+      ..targetPreview = TargetPreviewMode.auto.name
+      ..language = AppLanguage.fromPlatform().code;
+    _prefsBox.put(prefs);
   }
 
-  void _load() {
-    if (!_file.existsSync()) return;
+  AppPrefs _prefs() {
+    final existing = _prefsBox.getAll();
+    if (existing.isNotEmpty) return existing.first;
+    final created = AppPrefs(language: AppLanguage.fromPlatform().code);
+    _prefsBox.put(created);
+    return created;
+  }
+
+  /// One-shot import from the older JSON save file.
+  @visibleForTesting
+  void importLegacyJson(Directory dir) => _migrateJsonIfNeeded(dir);
+
+  void _migrateJsonIfNeeded(Directory dir) {
+    final file = File(p.join(dir.path, 'quadcraft-progress.json'));
+    if (!file.existsSync()) return;
+    if (_levels.count() > 0) return;
     try {
-      final decoded = jsonDecode(_file.readAsStringSync());
+      final decoded = jsonDecode(file.readAsStringSync());
       if (decoded is! Map<String, dynamic>) return;
-      _muted = decoded['muted'] == true;
+      final prefs = _prefs()
+        ..muted = decoded['muted'] == true
+        ..confetti = ConfettiAmount.fromStored(
+          code: decoded['confetti'] as String?,
+          reducedFlag: decoded['reducedConfetti'] == true,
+        ).name
+        ..language = AppLanguage.fromCode(
+          decoded['language'] as String? ?? AppLanguage.fromPlatform().code,
+        ).code
+        ..targetPreview = TargetPreviewMode.fromStored(
+          decoded['targetPreview'] as String?,
+        ).name;
+      _prefsBox.put(prefs);
       final levels = decoded['levels'];
-      if (levels is! List) return;
-      for (final entry in levels) {
-        if (entry is! Map<String, dynamic>) continue;
-        final record = LevelRecord.fromJson(entry);
-        _records[record.levelNumber] = record;
+      if (levels is List) {
+        for (final entry in levels) {
+          if (entry is! Map<String, dynamic>) continue;
+          _levels.put(LevelRecord.fromJson(entry));
+        }
       }
+      file.deleteSync();
     } catch (error, stack) {
       debugPrint('quadcraft: ignoring unreadable save file ($error)');
       debugPrintStack(stackTrace: stack, maxFrames: 4);
     }
-  }
-
-  void _save() {
-    final payload = jsonEncode({
-      'muted': _muted,
-      'levels': [for (final record in _records.values) record.toJson()],
-    });
-    final sibling = File('${_file.path}.tmp');
-    sibling.writeAsStringSync(payload);
-    sibling.renameSync(_file.path);
   }
 }
 
@@ -171,6 +262,15 @@ class MemoryProgressStore implements ProgressRepository {
   bool muted = false;
 
   @override
+  ConfettiAmount confetti = ConfettiAmount.full;
+
+  @override
+  String languageCode = AppLanguage.fromPlatform().code;
+
+  @override
+  TargetPreviewMode targetPreview = TargetPreviewMode.auto;
+
+  @override
   LevelRecord? recordFor(int levelNumber) => _records[levelNumber];
 
   @override
@@ -180,10 +280,7 @@ class MemoryProgressStore implements ProgressRepository {
   int highestUnlocked(int levelCount) => firstUnsolved(levelCount, recordFor);
 
   @override
-  ClearResult recordClear({
-    required int levelNumber,
-    required int moves,
-  }) {
+  ClearResult recordClear({required int levelNumber, required int moves}) {
     final merged = mergeClear(
       existing: _records[levelNumber],
       levelNumber: levelNumber,
@@ -197,6 +294,9 @@ class MemoryProgressStore implements ProgressRepository {
   void resetAll() {
     _records.clear();
     muted = false;
+    confetti = ConfettiAmount.full;
+    targetPreview = TargetPreviewMode.auto;
+    languageCode = AppLanguage.fromPlatform().code;
   }
 }
 

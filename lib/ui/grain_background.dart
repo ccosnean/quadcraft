@@ -262,8 +262,9 @@ class _QuadParticle {
     QuadColor.yellow,
     QuadColor.purple,
     QuadColor.cyan,
+    QuadColor.orange,
+    QuadColor.magenta,
   ];
-
 }
 
 class _BackdropPainter extends CustomPainter {
@@ -289,7 +290,11 @@ class _BackdropPainter extends CustomPainter {
         ..shader = ui.Gradient.linear(
           rect.topCenter,
           rect.bottomCenter,
-          const [Palette.backdropTop, Palette.backdropBottom, Color(0xFF0A1216)],
+          const [
+            Palette.backdropTop,
+            Palette.backdropBottom,
+            Color(0xFF0A1216),
+          ],
           const [0.0, 0.55, 1.0],
         ),
     );
@@ -339,7 +344,10 @@ class _BackdropPainter extends CustomPainter {
     for (final particle in particles) {
       if (particle.life <= 0.01) continue;
 
-      final center = Offset(particle.nx * size.width, particle.ny * size.height);
+      final center = Offset(
+        particle.nx * size.width,
+        particle.ny * size.height,
+      );
       final radius = particle.baseSize * particle.displayScale;
       if (radius < 2) continue;
 
@@ -350,7 +358,9 @@ class _BackdropPainter extends CustomPainter {
         ..color = base.withValues(alpha: fillAlpha);
       final glow = Paint()
         ..isAntiAlias = true
-        ..color = Palette.piece(particle.color).withValues(alpha: fillAlpha * 0.35)
+        ..color = Palette.piece(
+          particle.color,
+        ).withValues(alpha: fillAlpha * 0.35)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, radius * 0.18);
       final stroke = Paint()
         ..style = PaintingStyle.stroke
@@ -364,9 +374,9 @@ class _BackdropPainter extends CustomPainter {
       canvas.rotate(particle.rotation);
       // Unit paths live in +x/+y; center the single quadrant on the particle.
       canvas.translate(-radius * 0.45, -radius * 0.45);
-      final path = ShapeGeometry.unitPath(particle.form).transform(
-        Matrix4.diagonal3Values(radius, radius, 1).storage,
-      );
+      final path = ShapeGeometry.unitPath(
+        particle.form,
+      ).transform(Matrix4.diagonal3Values(radius, radius, 1).storage);
       canvas.drawPath(path, glow);
       canvas.drawPath(path, fill);
       canvas.drawPath(path, stroke);

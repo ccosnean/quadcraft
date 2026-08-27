@@ -54,6 +54,7 @@ class Level {
   const Level({
     required this.number,
     required this.name,
+    required this.section,
     required this.brief,
     required this.goal,
     required this.solution,
@@ -67,7 +68,10 @@ class Level {
   final int number;
   final String name;
 
-  /// One line shown under the level title; teaches the new idea.
+  /// World / chapter label used to group levels in the select screen.
+  final String section;
+
+  /// Flavour line under the target. Teaches a feel, not the walkthrough.
   final String brief;
 
   final Shape goal;

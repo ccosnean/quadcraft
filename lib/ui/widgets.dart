@@ -60,7 +60,11 @@ class Plate extends StatelessWidget {
 
 /// Raised surface used for header and tray panels.
 class Panel extends StatelessWidget {
-  const Panel({super.key, required this.child, this.padding = const EdgeInsets.all(14)});
+  const Panel({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(14),
+  });
 
   final Widget child;
   final EdgeInsets padding;
@@ -99,12 +103,11 @@ class Overline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(
-        text.toUpperCase(),
-        style: Theme.of(context)
-            .textTheme
-            .labelMedium
-            ?.copyWith(color: color ?? Palette.inkFaint),
-      );
+    text.toUpperCase(),
+    style: Theme.of(
+      context,
+    ).textTheme.labelMedium?.copyWith(color: color ?? Palette.inkFaint),
+  );
 }
 
 /// Primary/secondary action button with a machined look.
@@ -115,6 +118,7 @@ class ActionButton extends StatelessWidget {
     required this.onPressed,
     this.icon,
     this.primary = false,
+    this.danger = false,
     this.expand = false,
   });
 
@@ -122,6 +126,7 @@ class ActionButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final IconData? icon;
   final bool primary;
+  final bool danger;
   final bool expand;
 
   @override
@@ -130,26 +135,52 @@ class ActionButton extends StatelessWidget {
     final foreground = primary
         ? const Color(0xFF20170A)
         : (enabled ? Palette.ink : Palette.inkFaint);
+    final fill = primary
+        ? Palette.brass
+        : danger
+        ? const Color(0xFF3A1A18)
+        : Palette.panelRaised;
+    final stroke = primary
+        ? Palette.brassBright.withValues(alpha: 0.7)
+        : danger
+        ? Palette.danger.withValues(alpha: 0.7)
+        : Palette.hairline;
+
+    final labelStyle = Theme.of(context).textTheme.labelLarge?.copyWith(
+      color: danger && !primary ? Palette.danger : foreground,
+    );
+    final labelText = Text(
+      label.toUpperCase(),
+      maxLines: 1,
+      softWrap: false,
+      style: labelStyle,
+    );
 
     final child = Row(
       mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
       children: [
         if (icon != null) ...[
-          Icon(icon, size: 18, color: foreground),
+          Icon(
+            icon,
+            size: 18,
+            color: danger && !primary ? Palette.danger : foreground,
+          ),
           const SizedBox(width: 8),
         ],
-        Text(
-          label.toUpperCase(),
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(color: foreground),
-        ),
+        if (expand)
+          Flexible(
+            child: FittedBox(fit: BoxFit.scaleDown, child: labelText),
+          )
+        else
+          labelText,
       ],
     );
 
     return Opacity(
       opacity: enabled ? 1 : 0.45,
       child: Material(
-        color: primary ? Palette.brass : Palette.panelRaised,
+        color: fill,
         borderRadius: BorderRadius.circular(16),
         elevation: primary ? 6 : 0,
         shadowColor: Palette.brass.withValues(alpha: 0.5),
@@ -160,9 +191,7 @@ class ActionButton extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: primary ? Palette.brassBright.withValues(alpha: 0.7) : Palette.hairline,
-              ),
+              border: Border.all(color: stroke),
             ),
             child: child,
           ),
@@ -193,8 +222,8 @@ class ToolButton extends StatelessWidget {
     final tint = !enabled
         ? Palette.inkFaint
         : accent
-            ? Palette.brassBright
-            : Palette.ink;
+        ? Palette.brassBright
+        : Palette.ink;
 
     return Semantics(
       button: true,
@@ -222,13 +251,17 @@ class ToolButton extends StatelessWidget {
                 children: [
                   Icon(icon, size: 22, color: tint),
                   const SizedBox(height: 4),
-                  Text(
-                    label.toUpperCase(),
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: tint,
-                          fontSize: 9,
-                          letterSpacing: 1.1,
-                        ),
+                  SizedBox(
+                    width: 54,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        label.toUpperCase(),
+                        maxLines: 1,
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(color: tint, fontSize: 9),
+                      ),
+                    ),
                   ),
                 ],
               ),

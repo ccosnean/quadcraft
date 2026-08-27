@@ -13,6 +13,7 @@ import '../../ui/theme.dart';
 import '../../ui/widgets.dart';
 import '../levels/level_select_screen.dart';
 import '../play/play_screen.dart';
+import '../settings/settings_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -21,6 +22,7 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final progress = ref.watch(progressProvider);
     final muted = ref.watch(mutedProvider);
+    final l10n = ref.watch(l10nProvider);
     final resume = progress.unlocked.clamp(1, kLevels.length);
     final started = progress.clearedCount > 0;
 
@@ -28,23 +30,42 @@ class HomeScreen extends ConsumerWidget {
       body: GrainBackground(
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
             child: Column(
               children: [
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: IconButton(
-                    onPressed: () => ref.read(mutedProvider.notifier).toggle(),
-                    icon: Icon(muted ? Icons.volume_off_rounded : Icons.volume_up_rounded),
-                    color: Palette.inkMuted,
-                    tooltip: muted ? 'Unmute' : 'Mute',
-                  ),
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () {
+                        ref.read(soundBankProvider).play(Sfx.tap);
+                        Navigator.of(context).push(SettingsScreen.route());
+                      },
+                      icon: const Icon(Icons.settings_rounded),
+                      color: Palette.inkMuted,
+                      tooltip: l10n.settings,
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () =>
+                          ref.read(mutedProvider.notifier).toggle(),
+                      icon: Icon(
+                        muted
+                            ? Icons.volume_off_rounded
+                            : Icons.volume_up_rounded,
+                      ),
+                      color: Palette.inkMuted,
+                      tooltip: muted ? l10n.unmute : l10n.mute,
+                    ),
+                  ],
                 ),
                 const Spacer(flex: 2),
-                Text('QUADCRAFT', style: Theme.of(context).textTheme.displayLarge),
+                Text(
+                  'QUADCRAFT',
+                  style: Theme.of(context).textTheme.displayLarge,
+                ),
                 const SizedBox(height: 8),
                 Text(
-                  'Turn, cut and stack to match the target.',
+                  l10n.tagline,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
@@ -52,7 +73,7 @@ class HomeScreen extends ConsumerWidget {
                 const _AttractShape(),
                 const Spacer(flex: 2),
                 ActionButton(
-                  label: started ? 'Continue  ·  level ${resume.toString().padLeft(2, '0')}' : 'Start',
+                  label: started ? l10n.continueLevel(resume) : l10n.start,
                   icon: Icons.play_arrow_rounded,
                   primary: true,
                   expand: true,
@@ -63,7 +84,7 @@ class HomeScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 ActionButton(
-                  label: 'All levels',
+                  label: l10n.allLevels,
                   icon: Icons.grid_view_rounded,
                   expand: true,
                   onPressed: () {
@@ -73,7 +94,7 @@ class HomeScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  '${progress.clearedCount} of ${kLevels.length} solved',
+                  l10n.solvedCount(progress.clearedCount, kLevels.length),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 16),
@@ -95,11 +116,13 @@ class _AttractShape extends StatefulWidget {
   State<_AttractShape> createState() => _AttractShapeState();
 }
 
-class _AttractShapeState extends State<_AttractShape> with SingleTickerProviderStateMixin {
+class _AttractShapeState extends State<_AttractShape>
+    with SingleTickerProviderStateMixin {
   static final _showcase = [
-    Shape.parse('Cr/Sg/Tb/Wy'),
-    Shape.parse('Sc+Cp/Sc+Cp/Cu/Cu'),
-    Shape.parse('Tu+Su/Cb/Wg/Sr'),
+    Shape.parse('Po/Cm/Po/Cm'),
+    Shape.parse('Lm+Cp/Lm+Cp/Lm+Cp/Lm+Cp'),
+    Shape.parse('Tr+Cc/Ty+Cc/Tb+Cc/Tg+Cc'),
+    Shape.parse('Pr+Cu/Lo/Tm/Wp'),
   ];
 
   late final _controller = AnimationController(
