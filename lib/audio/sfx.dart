@@ -68,7 +68,11 @@ class SoundBank {
   static double _volumeFor(Sfx sfx) => switch (sfx) {
     Sfx.win => 0.7,
     Sfx.paint => 0.65,
-    Sfx.tap || Sfx.pickup => 0.45,
+    // Louder than it looks like it should be. Alone it is a soft tick, but it
+    // is also the only effect quiet enough for the music to bury outright, and
+    // a button press that makes no sound reads as a button that did not work.
+    Sfx.tap => 0.62,
+    Sfx.pickup => 0.45,
     _ => 0.6,
   };
 

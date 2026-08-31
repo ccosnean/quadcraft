@@ -22,7 +22,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(1, 696186474022560818),
     name: 'AppPrefs',
-    lastPropertyId: const obx_int.IdUid(5, 573261110942141302),
+    lastPropertyId: const obx_int.IdUid(12, 5886635169088249811),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -53,6 +53,42 @@ final _entities = <obx_int.ModelEntity>[
         id: const obx_int.IdUid(5, 573261110942141302),
         name: 'targetPreview',
         type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(6, 3492594772687494522),
+        name: 'devUnlockAll',
+        type: 1,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(7, 3719888915290709193),
+        name: 'tutorialSkipped',
+        type: 1,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(9, 5921881128573986864),
+        name: 'musicOff',
+        type: 1,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(10, 7051807505869939239),
+        name: 'keys',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(11, 9125920225640025742),
+        name: 'keysDay',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(12, 5886635169088249811),
+        name: 'earnedKeys',
+        type: 6,
         flags: 0,
       ),
     ],
@@ -88,6 +124,134 @@ final _entities = <obx_int.ModelEntity>[
         id: const obx_int.IdUid(4, 1561399661379393555),
         name: 'clears',
         type: 6,
+        flags: 0,
+      ),
+    ],
+    relations: <obx_int.ModelRelation>[],
+    backlinks: <obx_int.ModelBacklink>[],
+  ),
+  obx_int.ModelEntity(
+    id: const obx_int.IdUid(3, 7042960972848980030),
+    name: 'Discovery',
+    lastPropertyId: const obx_int.IdUid(4, 968105402764925272),
+    flags: 0,
+    properties: <obx_int.ModelProperty>[
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(1, 4630937908179646813),
+        name: 'id',
+        type: 6,
+        flags: 1,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(2, 1886906561959475230),
+        name: 'shapeId',
+        type: 9,
+        flags: 2080,
+        indexId: const obx_int.IdUid(2, 6215712520415671471),
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(3, 4777177892146783925),
+        name: 'depth',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(4, 968105402764925272),
+        name: 'foundAt',
+        type: 6,
+        flags: 0,
+      ),
+    ],
+    relations: <obx_int.ModelRelation>[],
+    backlinks: <obx_int.ModelBacklink>[],
+  ),
+  obx_int.ModelEntity(
+    id: const obx_int.IdUid(4, 3526799211506819776),
+    name: 'DiveRecord',
+    lastPropertyId: const obx_int.IdUid(4, 405115349854296517),
+    flags: 0,
+    properties: <obx_int.ModelProperty>[
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(1, 5422877886476078260),
+        name: 'id',
+        type: 6,
+        flags: 1,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(2, 7135218827167133887),
+        name: 'depth',
+        type: 6,
+        flags: 40,
+        indexId: const obx_int.IdUid(3, 5911073909228022332),
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(3, 7686990482863479133),
+        name: 'bestMoves',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(4, 405115349854296517),
+        name: 'clears',
+        type: 6,
+        flags: 0,
+      ),
+    ],
+    relations: <obx_int.ModelRelation>[],
+    backlinks: <obx_int.ModelBacklink>[],
+  ),
+  obx_int.ModelEntity(
+    id: const obx_int.IdUid(5, 4626230525506436141),
+    name: 'DiveRun',
+    lastPropertyId: const obx_int.IdUid(8, 5661526352088913423),
+    flags: 0,
+    properties: <obx_int.ModelProperty>[
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(1, 3297401070713320499),
+        name: 'id',
+        type: 6,
+        flags: 1,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(2, 4504994355289024386),
+        name: 'seed',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(3, 935676952252576314),
+        name: 'depth',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(4, 3102675273162610152),
+        name: 'deepest',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(5, 5024905638812557426),
+        name: 'clears',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(6, 9101806251130899403),
+        name: 'runs',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(7, 4418115417257861942),
+        name: 'homeSeed',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(8, 5661526352088913423),
+        name: 'keyUnlocked',
+        type: 27,
         flags: 0,
       ),
     ],
@@ -139,13 +303,13 @@ obx_int.ModelDefinition getObjectBoxModel() {
     // Typically, this is done with `dart run build_runner build`.
     generatorVersion: obx_int.GeneratorVersion.v2025_12_16,
     entities: _entities,
-    lastEntityId: const obx_int.IdUid(2, 1183849958889912128),
-    lastIndexId: const obx_int.IdUid(1, 4912966184143097217),
+    lastEntityId: const obx_int.IdUid(5, 4626230525506436141),
+    lastIndexId: const obx_int.IdUid(3, 5911073909228022332),
     lastRelationId: const obx_int.IdUid(0, 0),
     lastSequenceId: const obx_int.IdUid(0, 0),
     retiredEntityUids: const [],
     retiredIndexUids: const [],
-    retiredPropertyUids: const [],
+    retiredPropertyUids: const [8231993722923013466],
     retiredRelationUids: const [],
     modelVersion: 5,
     modelVersionParserMinimum: 5,
@@ -165,12 +329,18 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final confettiOffset = fbb.writeString(object.confetti);
         final languageOffset = fbb.writeString(object.language);
         final targetPreviewOffset = fbb.writeString(object.targetPreview);
-        fbb.startTable(6);
+        fbb.startTable(13);
         fbb.addInt64(0, object.id);
         fbb.addBool(1, object.muted);
         fbb.addOffset(2, confettiOffset);
         fbb.addOffset(3, languageOffset);
         fbb.addOffset(4, targetPreviewOffset);
+        fbb.addBool(5, object.devUnlockAll);
+        fbb.addBool(6, object.tutorialSkipped);
+        fbb.addBool(8, object.musicOff);
+        fbb.addInt64(9, object.keys);
+        fbb.addInt64(10, object.keysDay);
+        fbb.addInt64(11, object.earnedKeys);
         fbb.finish(fbb.endTable());
         return object.id;
       },
@@ -189,6 +359,30 @@ obx_int.ModelDefinition getObjectBoxModel() {
           6,
           false,
         );
+        final musicOffParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          20,
+          false,
+        );
+        final keysParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          22,
+          0,
+        );
+        final keysDayParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          24,
+          0,
+        );
+        final earnedKeysParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          26,
+          0,
+        );
         final confettiParam = const fb.StringReader(
           asciiOptimization: true,
         ).vTableGet(buffer, rootOffset, 8, '');
@@ -198,12 +392,30 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final targetPreviewParam = const fb.StringReader(
           asciiOptimization: true,
         ).vTableGet(buffer, rootOffset, 12, '');
+        final tutorialSkippedParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          16,
+          false,
+        );
+        final devUnlockAllParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          14,
+          false,
+        );
         final object = AppPrefs(
           id: idParam,
           muted: mutedParam,
+          musicOff: musicOffParam,
+          keys: keysParam,
+          keysDay: keysDayParam,
+          earnedKeys: earnedKeysParam,
           confetti: confettiParam,
           language: languageParam,
           targetPreview: targetPreviewParam,
+          tutorialSkipped: tutorialSkippedParam,
+          devUnlockAll: devUnlockAllParam,
         );
 
         return object;
@@ -263,6 +475,197 @@ obx_int.ModelDefinition getObjectBoxModel() {
         return object;
       },
     ),
+    Discovery: obx_int.EntityDefinition<Discovery>(
+      model: _entities[2],
+      toOneRelations: (Discovery object) => [],
+      toManyRelations: (Discovery object) => {},
+      getId: (Discovery object) => object.id,
+      setId: (Discovery object, int id) {
+        object.id = id;
+      },
+      objectToFB: (Discovery object, fb.Builder fbb) {
+        final shapeIdOffset = fbb.writeString(object.shapeId);
+        fbb.startTable(5);
+        fbb.addInt64(0, object.id);
+        fbb.addOffset(1, shapeIdOffset);
+        fbb.addInt64(2, object.depth);
+        fbb.addInt64(3, object.foundAt);
+        fbb.finish(fbb.endTable());
+        return object.id;
+      },
+      objectFromFB: (obx.Store store, ByteData fbData) {
+        final buffer = fb.BufferContext(fbData);
+        final rootOffset = buffer.derefObject(0);
+        final idParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          4,
+          0,
+        );
+        final shapeIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 6, '');
+        final depthParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          8,
+          0,
+        );
+        final foundAtParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          10,
+          0,
+        );
+        final object = Discovery(
+          id: idParam,
+          shapeId: shapeIdParam,
+          depth: depthParam,
+          foundAt: foundAtParam,
+        );
+
+        return object;
+      },
+    ),
+    DiveRecord: obx_int.EntityDefinition<DiveRecord>(
+      model: _entities[3],
+      toOneRelations: (DiveRecord object) => [],
+      toManyRelations: (DiveRecord object) => {},
+      getId: (DiveRecord object) => object.id,
+      setId: (DiveRecord object, int id) {
+        object.id = id;
+      },
+      objectToFB: (DiveRecord object, fb.Builder fbb) {
+        fbb.startTable(5);
+        fbb.addInt64(0, object.id);
+        fbb.addInt64(1, object.depth);
+        fbb.addInt64(2, object.bestMoves);
+        fbb.addInt64(3, object.clears);
+        fbb.finish(fbb.endTable());
+        return object.id;
+      },
+      objectFromFB: (obx.Store store, ByteData fbData) {
+        final buffer = fb.BufferContext(fbData);
+        final rootOffset = buffer.derefObject(0);
+        final idParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          4,
+          0,
+        );
+        final depthParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          6,
+          0,
+        );
+        final bestMovesParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          8,
+          0,
+        );
+        final clearsParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          10,
+          0,
+        );
+        final object = DiveRecord(
+          id: idParam,
+          depth: depthParam,
+          bestMoves: bestMovesParam,
+          clears: clearsParam,
+        );
+
+        return object;
+      },
+    ),
+    DiveRun: obx_int.EntityDefinition<DiveRun>(
+      model: _entities[4],
+      toOneRelations: (DiveRun object) => [],
+      toManyRelations: (DiveRun object) => {},
+      getId: (DiveRun object) => object.id,
+      setId: (DiveRun object, int id) {
+        object.id = id;
+      },
+      objectToFB: (DiveRun object, fb.Builder fbb) {
+        final keyUnlockedOffset = fbb.writeListInt64(object.keyUnlocked);
+        fbb.startTable(9);
+        fbb.addInt64(0, object.id);
+        fbb.addInt64(1, object.seed);
+        fbb.addInt64(2, object.depth);
+        fbb.addInt64(3, object.deepest);
+        fbb.addInt64(4, object.clears);
+        fbb.addInt64(5, object.runs);
+        fbb.addInt64(6, object.homeSeed);
+        fbb.addOffset(7, keyUnlockedOffset);
+        fbb.finish(fbb.endTable());
+        return object.id;
+      },
+      objectFromFB: (obx.Store store, ByteData fbData) {
+        final buffer = fb.BufferContext(fbData);
+        final rootOffset = buffer.derefObject(0);
+        final idParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          4,
+          0,
+        );
+        final seedParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          6,
+          0,
+        );
+        final homeSeedParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          16,
+          0,
+        );
+        final depthParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          8,
+          0,
+        );
+        final deepestParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          10,
+          0,
+        );
+        final clearsParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          12,
+          0,
+        );
+        final runsParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          14,
+          0,
+        );
+        final keyUnlockedParam = const fb.ListReader<int>(
+          fb.Int64Reader(),
+          lazy: false,
+        ).vTableGet(buffer, rootOffset, 18, []);
+        final object = DiveRun(
+          id: idParam,
+          seed: seedParam,
+          homeSeed: homeSeedParam,
+          depth: depthParam,
+          deepest: deepestParam,
+          clears: clearsParam,
+          runs: runsParam,
+          keyUnlocked: keyUnlockedParam,
+        );
+
+        return object;
+      },
+    ),
   };
 
   return obx_int.ModelDefinition(model, bindings);
@@ -294,6 +697,36 @@ class AppPrefs_ {
   static final targetPreview = obx.QueryStringProperty<AppPrefs>(
     _entities[0].properties[4],
   );
+
+  /// See [AppPrefs.devUnlockAll].
+  static final devUnlockAll = obx.QueryBooleanProperty<AppPrefs>(
+    _entities[0].properties[5],
+  );
+
+  /// See [AppPrefs.tutorialSkipped].
+  static final tutorialSkipped = obx.QueryBooleanProperty<AppPrefs>(
+    _entities[0].properties[6],
+  );
+
+  /// See [AppPrefs.musicOff].
+  static final musicOff = obx.QueryBooleanProperty<AppPrefs>(
+    _entities[0].properties[7],
+  );
+
+  /// See [AppPrefs.keys].
+  static final keys = obx.QueryIntegerProperty<AppPrefs>(
+    _entities[0].properties[8],
+  );
+
+  /// See [AppPrefs.keysDay].
+  static final keysDay = obx.QueryIntegerProperty<AppPrefs>(
+    _entities[0].properties[9],
+  );
+
+  /// See [AppPrefs.earnedKeys].
+  static final earnedKeys = obx.QueryIntegerProperty<AppPrefs>(
+    _entities[0].properties[10],
+  );
 }
 
 /// [LevelRecord] entity fields to define ObjectBox queries.
@@ -316,5 +749,94 @@ class LevelRecord_ {
   /// See [LevelRecord.clears].
   static final clears = obx.QueryIntegerProperty<LevelRecord>(
     _entities[1].properties[3],
+  );
+}
+
+/// [Discovery] entity fields to define ObjectBox queries.
+class Discovery_ {
+  /// See [Discovery.id].
+  static final id = obx.QueryIntegerProperty<Discovery>(
+    _entities[2].properties[0],
+  );
+
+  /// See [Discovery.shapeId].
+  static final shapeId = obx.QueryStringProperty<Discovery>(
+    _entities[2].properties[1],
+  );
+
+  /// See [Discovery.depth].
+  static final depth = obx.QueryIntegerProperty<Discovery>(
+    _entities[2].properties[2],
+  );
+
+  /// See [Discovery.foundAt].
+  static final foundAt = obx.QueryIntegerProperty<Discovery>(
+    _entities[2].properties[3],
+  );
+}
+
+/// [DiveRecord] entity fields to define ObjectBox queries.
+class DiveRecord_ {
+  /// See [DiveRecord.id].
+  static final id = obx.QueryIntegerProperty<DiveRecord>(
+    _entities[3].properties[0],
+  );
+
+  /// See [DiveRecord.depth].
+  static final depth = obx.QueryIntegerProperty<DiveRecord>(
+    _entities[3].properties[1],
+  );
+
+  /// See [DiveRecord.bestMoves].
+  static final bestMoves = obx.QueryIntegerProperty<DiveRecord>(
+    _entities[3].properties[2],
+  );
+
+  /// See [DiveRecord.clears].
+  static final clears = obx.QueryIntegerProperty<DiveRecord>(
+    _entities[3].properties[3],
+  );
+}
+
+/// [DiveRun] entity fields to define ObjectBox queries.
+class DiveRun_ {
+  /// See [DiveRun.id].
+  static final id = obx.QueryIntegerProperty<DiveRun>(
+    _entities[4].properties[0],
+  );
+
+  /// See [DiveRun.seed].
+  static final seed = obx.QueryIntegerProperty<DiveRun>(
+    _entities[4].properties[1],
+  );
+
+  /// See [DiveRun.depth].
+  static final depth = obx.QueryIntegerProperty<DiveRun>(
+    _entities[4].properties[2],
+  );
+
+  /// See [DiveRun.deepest].
+  static final deepest = obx.QueryIntegerProperty<DiveRun>(
+    _entities[4].properties[3],
+  );
+
+  /// See [DiveRun.clears].
+  static final clears = obx.QueryIntegerProperty<DiveRun>(
+    _entities[4].properties[4],
+  );
+
+  /// See [DiveRun.runs].
+  static final runs = obx.QueryIntegerProperty<DiveRun>(
+    _entities[4].properties[5],
+  );
+
+  /// See [DiveRun.homeSeed].
+  static final homeSeed = obx.QueryIntegerProperty<DiveRun>(
+    _entities[4].properties[6],
+  );
+
+  /// See [DiveRun.keyUnlocked].
+  static final keyUnlocked = obx.QueryIntegerVectorProperty<DiveRun>(
+    _entities[4].properties[7],
   );
 }

@@ -5,7 +5,7 @@
   "entities": [
     {
       "id": "1:696186474022560818",
-      "lastPropertyId": "5:573261110942141302",
+      "lastPropertyId": "12:5886635169088249811",
       "name": "AppPrefs",
       "properties": [
         {
@@ -33,6 +33,36 @@
           "id": "5:573261110942141302",
           "name": "targetPreview",
           "type": 9
+        },
+        {
+          "id": "6:3492594772687494522",
+          "name": "devUnlockAll",
+          "type": 1
+        },
+        {
+          "id": "7:3719888915290709193",
+          "name": "tutorialSkipped",
+          "type": 1
+        },
+        {
+          "id": "9:5921881128573986864",
+          "name": "musicOff",
+          "type": 1
+        },
+        {
+          "id": "10:7051807505869939239",
+          "name": "keys",
+          "type": 6
+        },
+        {
+          "id": "11:9125920225640025742",
+          "name": "keysDay",
+          "type": 6
+        },
+        {
+          "id": "12:5886635169088249811",
+          "name": "earnedKeys",
+          "type": 6
         }
       ],
       "relations": []
@@ -67,17 +97,130 @@
         }
       ],
       "relations": []
+    },
+    {
+      "id": "3:7042960972848980030",
+      "lastPropertyId": "4:968105402764925272",
+      "name": "Discovery",
+      "properties": [
+        {
+          "id": "1:4630937908179646813",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:1886906561959475230",
+          "name": "shapeId",
+          "indexId": "2:6215712520415671471",
+          "type": 9,
+          "flags": 2080
+        },
+        {
+          "id": "3:4777177892146783925",
+          "name": "depth",
+          "type": 6
+        },
+        {
+          "id": "4:968105402764925272",
+          "name": "foundAt",
+          "type": 6
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "4:3526799211506819776",
+      "lastPropertyId": "4:405115349854296517",
+      "name": "DiveRecord",
+      "properties": [
+        {
+          "id": "1:5422877886476078260",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:7135218827167133887",
+          "name": "depth",
+          "indexId": "3:5911073909228022332",
+          "type": 6,
+          "flags": 40
+        },
+        {
+          "id": "3:7686990482863479133",
+          "name": "bestMoves",
+          "type": 6
+        },
+        {
+          "id": "4:405115349854296517",
+          "name": "clears",
+          "type": 6
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "5:4626230525506436141",
+      "lastPropertyId": "8:5661526352088913423",
+      "name": "DiveRun",
+      "properties": [
+        {
+          "id": "1:3297401070713320499",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:4504994355289024386",
+          "name": "seed",
+          "type": 6
+        },
+        {
+          "id": "3:935676952252576314",
+          "name": "depth",
+          "type": 6
+        },
+        {
+          "id": "4:3102675273162610152",
+          "name": "deepest",
+          "type": 6
+        },
+        {
+          "id": "5:5024905638812557426",
+          "name": "clears",
+          "type": 6
+        },
+        {
+          "id": "6:9101806251130899403",
+          "name": "runs",
+          "type": 6
+        },
+        {
+          "id": "7:4418115417257861942",
+          "name": "homeSeed",
+          "type": 6
+        },
+        {
+          "id": "8:5661526352088913423",
+          "name": "keyUnlocked",
+          "type": 27
+        }
+      ],
+      "relations": []
     }
   ],
-  "lastEntityId": "2:1183849958889912128",
-  "lastIndexId": "1:4912966184143097217",
+  "lastEntityId": "5:4626230525506436141",
+  "lastIndexId": "3:5911073909228022332",
   "lastRelationId": "0:0",
   "lastSequenceId": "0:0",
   "modelVersion": 5,
   "modelVersionParserMinimum": 5,
   "retiredEntityUids": [],
   "retiredIndexUids": [],
-  "retiredPropertyUids": [],
+  "retiredPropertyUids": [
+    8231993722923013466
+  ],
   "retiredRelationUids": [],
   "version": 1
 }

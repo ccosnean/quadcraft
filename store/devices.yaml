@@ -1,0 +1,33 @@
+# Screenshot capture targets for test/store_screenshots_test.dart, run via
+# tool/store/capture_screenshots.sh. Rendered directly with `flutter test`
+# (RenderRepaintBoundary.toImage at the exact pixel size below) — no
+# simulator or emulator involved, so these are just target dimensions, not
+# real device profiles.
+#
+# `folder` is where captured PNGs land under
+# store/screenshots/<locale>/<folder>/.
+#
+# iOS: the app is universal (TARGETED_DEVICE_FAMILY = "1,2"), so App Store
+# Connect requires both an iPhone and an iPad screenshot set. 6.9" is
+# currently the only mandatory iPhone size (Apple derives the rest); 13"
+# iPad is the current mandatory iPad size. Physical pixel dimensions are
+# Apple's published values for those display classes.
+ios:
+  - folder: ios-6.9
+    width: 1320
+    height: 2868
+    pixel_ratio: 3.0
+  - folder: ios-ipad-13
+    width: 2064
+    height: 2752
+    pixel_ratio: 2.0
+
+# Android: Play requires at least 2 phone screenshots; it accepts a wide
+# range of resolutions (long edge 320-3840px, roughly 16:9-21:9). 1080x2400
+# @3x is a common, safely-accepted modern phone size. 7"/10" tablet sets are
+# optional and left out of v1 — add entries here if you want them later.
+android:
+  - folder: android-phone
+    width: 1080
+    height: 2400
+    pixel_ratio: 3.0

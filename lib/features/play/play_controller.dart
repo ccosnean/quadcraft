@@ -5,7 +5,7 @@ import '../../app_providers.dart';
 import '../../audio/sfx.dart';
 import '../../core/level/game_state.dart';
 import '../../core/level/level.dart';
-import '../../core/level/levels.dart';
+import '../../core/level/level_catalog.dart';
 import '../../core/shape/shape.dart';
 import '../../core/shape/shape_ops.dart';
 import '../../data/progress_store.dart';
@@ -125,10 +125,9 @@ class PlayState {
   );
 }
 
-class PlayController extends AutoDisposeFamilyNotifier<PlayState, int> {
+class PlayController extends AutoDisposeFamilyNotifier<PlayState, LevelRef> {
   @override
-  PlayState build(int levelNumber) =>
-      PlayState.fresh(levelByNumber(levelNumber));
+  PlayState build(LevelRef ref) => PlayState.fresh(levelFor(ref));
 
   SoundBank get _sound => ref.read(soundBankProvider);
 
@@ -173,9 +172,26 @@ class PlayController extends AutoDisposeFamilyNotifier<PlayState, int> {
   }
 
   void _finish() {
-    final clear = ref
-        .read(progressProvider.notifier)
-        .recordClear(levelNumber: state.level.number, moves: state.scoredMoves);
+    final level = state.level;
+    final clear = arg.isChallenge
+        ? _unrecordedClear(state.scoredMoves)
+        : switch (level.kind) {
+            LevelKind.campaign =>
+              ref
+                  .read(progressProvider.notifier)
+                  .recordClear(
+                    levelNumber: level.number,
+                    moves: state.scoredMoves,
+                  ),
+            LevelKind.endless =>
+              ref
+                  .read(diveProvider.notifier)
+                  .recordClear(
+                    depth: level.number,
+                    moves: state.scoredMoves,
+                    goalId: level.goal.id,
+                  ),
+          };
     _sound.play(Sfx.win);
     state = state.copyWith(
       clear: clear,
@@ -183,6 +199,16 @@ class PlayController extends AutoDisposeFamilyNotifier<PlayState, int> {
       effectId: state.effectId + 1,
     );
   }
+
+  /// The result of clearing somebody else's level. Nothing is written: the
+  /// depth belongs to their seed, so a record of it would sit in this run's
+  /// table as a score against a puzzle this run does not contain.
+  static ClearResult _unrecordedClear(int moves) => ClearResult(
+    moves: moves,
+    bestMoves: moves,
+    isNewBestMoves: false,
+    isFirstClear: false,
+  );
 
   void undo() {
     if (!state.canUndo) {
@@ -233,4 +259,4 @@ class PlayController extends AutoDisposeFamilyNotifier<PlayState, int> {
 }
 
 final playControllerProvider = NotifierProvider.autoDispose
-    .family<PlayController, PlayState, int>(PlayController.new);
+    .family<PlayController, PlayState, LevelRef>(PlayController.new);

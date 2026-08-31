@@ -1,0 +1,22 @@
+# Maps our in-app AppLanguage codes (lib/l10n/l10n.dart) to each store's own
+# locale codes. tool/store/sync_store_content.dart reads store/content/<our
+# code>/meta.yaml and writes it out under the ios/android codes below.
+#
+# These are best-effort as of this writing — both consoles occasionally add
+# or rename locales, so if `deliver`/`supply` rejects a code, check the
+# current list in App Store Connect / Play Console and fix it here (not in
+# the generated fastlane folders, which get overwritten on every sync).
+
+en: {ios: en-US, android: en-US}
+zh: {ios: zh-Hans, android: zh-CN}
+hi: {ios: hi,      android: hi-IN}
+es: {ios: es-ES,   android: es-ES}
+ar: {ios: ar-SA,   android: ar}
+pt: {ios: pt-PT,   android: pt-PT}
+fr: {ios: fr-FR,   android: fr-FR}
+id: {ios: id,      android: id}
+ja: {ios: ja,      android: ja-JP}
+de: {ios: de-DE,   android: de-DE}
+ko: {ios: ko,      android: ko-KR}
+ru: {ios: ru,      android: ru-RU}
+ro: {ios: ro,      android: ro}

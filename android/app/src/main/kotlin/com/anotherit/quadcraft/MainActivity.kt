@@ -1,4 +1,4 @@
-package com.quadcraft.quadcraft
+package com.anotherit.quadcraft
 
 import io.flutter.embedding.android.FlutterActivity
 

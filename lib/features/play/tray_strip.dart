@@ -15,8 +15,10 @@ import '../../ui/widgets.dart';
 typedef TrayShapeTap = void Function(Shape shape, Rect globalOrigin);
 typedef TrayColorTap = void Function(QuadColor color, Rect globalOrigin);
 
-/// Bottom tray: reusable blueprints and paints. Tap places; the list scrolls
-/// freely with no drag competing for the gesture.
+/// Bottom tray: reusable blueprints and paints. Flush, full-bleed and one
+/// shade darker than the board above it — a shelf built into the surface,
+/// not a card floating on it. A row that overflows fades at the edge it
+/// still has more to show, rather than spilling past a card or hard-clipping.
 class TrayStrip extends ConsumerWidget {
   const TrayStrip({
     super.key,
@@ -39,35 +41,41 @@ class TrayStrip extends ConsumerWidget {
   /// When false (e.g. a flight is in progress), taps are ignored.
   final bool enabled;
 
+  static const _hPad = 20.0;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = ref.watch(l10nProvider);
-    return Panel(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Overline(l10n.blueprints),
-              const Spacer(),
-              Overline(
-                l10n.tapToPlace,
-                color: Palette.inkFaint.withValues(alpha: 0.8),
+    return ColoredBox(
+      color: Palette.panelSunken,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(0, 14, 0, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: _hPad),
+              child: Row(
+                children: [
+                  Overline(l10n.blueprints),
+                  const Spacer(),
+                  Overline(
+                    l10n.tapToPlace,
+                    color: Palette.inkFaint.withValues(alpha: 0.8),
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          if (shapes.isEmpty)
-            const _EmptyTrayHint()
-          else
-            SizedBox(
-              height: 78,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                clipBehavior: Clip.none,
+            ),
+            const SizedBox(height: 10),
+            if (shapes.isEmpty)
+              const _EmptyTrayHint()
+            else
+              _EdgeFadeRow(
+                height: 78,
+                fadeColor: Palette.panelSunken,
                 itemCount: shapes.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 10),
+                separatorWidth: 10,
+                padding: _hPad,
                 itemBuilder: (context, index) {
                   final shape = shapes[index];
                   return _ChipEntrance(
@@ -81,18 +89,19 @@ class TrayStrip extends ConsumerWidget {
                   );
                 },
               ),
-            ),
-          if (colors.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            Overline(l10n.paint),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 52,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                clipBehavior: Clip.none,
+            if (colors.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: _hPad),
+                child: Overline(l10n.paint),
+              ),
+              const SizedBox(height: 10),
+              _EdgeFadeRow(
+                height: 52,
+                fadeColor: Palette.panelSunken,
                 itemCount: colors.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 12),
+                separatorWidth: 14,
+                padding: _hPad,
                 itemBuilder: (context, index) => _ChipEntrance(
                   key: ValueKey('paint-${colors[index].name}'),
                   child: _ColorChip(
@@ -102,9 +111,9 @@ class TrayStrip extends ConsumerWidget {
                   ),
                 ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -122,6 +131,124 @@ class _EmptyTrayHint extends ConsumerWidget {
       style: Theme.of(context).textTheme.bodySmall,
     ),
   );
+}
+
+/// A horizontally scrolling row whose edges fade out honestly: a side only
+/// fades once there is something to scroll back to on it, and the fade
+/// clears once you've reached that end — the flush answer to a row that
+/// used to either spill past its card or cut its last chip off dead flat.
+class _EdgeFadeRow extends StatefulWidget {
+  const _EdgeFadeRow({
+    required this.height,
+    required this.itemCount,
+    required this.separatorWidth,
+    required this.padding,
+    required this.fadeColor,
+    required this.itemBuilder,
+  });
+
+  final double height;
+  final int itemCount;
+  final double separatorWidth;
+  final double padding;
+  final Color fadeColor;
+  final IndexedWidgetBuilder itemBuilder;
+
+  @override
+  State<_EdgeFadeRow> createState() => _EdgeFadeRowState();
+}
+
+class _EdgeFadeRowState extends State<_EdgeFadeRow> {
+  static const _fadeWidth = 28.0;
+  static const _fadeSpan = 24.0;
+
+  final _controller = ScrollController();
+  double _leftFade = 0;
+  double _rightFade = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_updateFade);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateFade());
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_updateFade);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _updateFade() {
+    if (!_controller.hasClients) return;
+    final position = _controller.position;
+    final left = ((position.pixels - position.minScrollExtent) / _fadeSpan)
+        .clamp(0.0, 1.0);
+    final right = ((position.maxScrollExtent - position.pixels) / _fadeSpan)
+        .clamp(0.0, 1.0);
+    if (left == _leftFade && right == _rightFade) return;
+    setState(() {
+      _leftFade = left;
+      _rightFade = right;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: widget.height,
+      child: NotificationListener<ScrollMetricsNotification>(
+        onNotification: (_) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _updateFade());
+          return false;
+        },
+        child: Stack(
+          children: [
+            ListView.separated(
+              controller: _controller,
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.symmetric(horizontal: widget.padding),
+              itemCount: widget.itemCount,
+              separatorBuilder: (_, _) =>
+                  SizedBox(width: widget.separatorWidth),
+              itemBuilder: widget.itemBuilder,
+            ),
+            _edge(atLeft: true, opacity: _leftFade),
+            _edge(atLeft: false, opacity: _rightFade),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _edge({required bool atLeft, required double opacity}) {
+    if (opacity <= 0) return const SizedBox.shrink();
+    return Positioned(
+      left: atLeft ? 0 : null,
+      right: atLeft ? null : 0,
+      top: 0,
+      bottom: 0,
+      width: _fadeWidth,
+      child: IgnorePointer(
+        child: Opacity(
+          opacity: opacity,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: atLeft ? Alignment.centerLeft : Alignment.centerRight,
+                end: atLeft ? Alignment.centerRight : Alignment.centerLeft,
+                colors: [
+                  widget.fadeColor,
+                  widget.fadeColor.withValues(alpha: 0),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 Rect? _globalBoundsOf(BuildContext context) {
@@ -149,14 +276,20 @@ class _ShapeChip extends ConsumerWidget {
       opacity: blocked ? 0.4 : 1,
       child: AspectRatio(
         aspectRatio: 1,
-        child: Plate(
-          radius: 18,
-          padding: const EdgeInsets.all(8),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final side = constraints.biggest.shortestSide;
-              return ShapeView(shape: shape, size: side);
-            },
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Palette.panel,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Palette.hairline),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final side = constraints.biggest.shortestSide;
+                return ShapeView(shape: shape, size: side);
+              },
+            ),
           ),
         ),
       ),
@@ -171,7 +304,7 @@ class _ShapeChip extends ConsumerWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             onTap: !enabled || blocked
                 ? null
                 : () {
@@ -237,16 +370,9 @@ class _Swatch extends StatelessWidget {
         shape: BoxShape.circle,
         color: Palette.piece(color),
         border: Border.all(
-          color: Colors.black.withValues(alpha: 0.45),
-          width: 1.5,
+          color: Colors.black.withValues(alpha: 0.35),
+          width: 2,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Palette.piece(color).withValues(alpha: 0.35),
-            blurRadius: diameter * 0.28,
-            offset: Offset(0, diameter * 0.08),
-          ),
-        ],
       ),
     );
   }

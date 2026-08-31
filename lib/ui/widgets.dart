@@ -1,8 +1,16 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'theme.dart';
 
-/// Sunken metal plate used for the board and every shape well.
+/// Metal plate used for shape wells, thumbnails and cards.
+///
+/// [sunken] swaps the elevated look (a gradient fill, dropped shadow — "this
+/// floats above the page") for an engraved one (a flat fill, an inset-shadow
+/// gradient — "this is cut into the page"). The board uses the sunken form so
+/// the one surface that is genuinely a physical object on screen reads as
+/// carved into the machine rather than floating a card above it.
 class Plate extends StatelessWidget {
   const Plate({
     super.key,
@@ -11,6 +19,7 @@ class Plate extends StatelessWidget {
     this.glow = 0.0,
     this.glowColor,
     this.padding = EdgeInsets.zero,
+    this.sunken = false,
   });
 
   final Widget child;
@@ -20,16 +29,78 @@ class Plate extends StatelessWidget {
   final double glow;
   final Color? glowColor;
   final EdgeInsets padding;
+  final bool sunken;
 
   @override
   Widget build(BuildContext context) {
     final accent = glowColor ?? Palette.brass;
+    final borderRadius = BorderRadius.circular(radius);
+
+    if (sunken) {
+      return AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          borderRadius: borderRadius,
+          border: Border.all(
+            color: Color.lerp(Palette.hairline, accent, glow * 0.9)!,
+            width: 1 + glow * 0.6,
+          ),
+          boxShadow: glow > 0
+              ? [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.22 * glow),
+                    blurRadius: 22 * glow,
+                    spreadRadius: 1.5 * glow,
+                  ),
+                ]
+              : const [],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(math.max(0, radius - 1)),
+          child: Stack(
+            fit: StackFit.passthrough,
+            children: [
+              const ColoredBox(color: Palette.panelSunken),
+              // Light doesn't reach the bottom of a well: a shadow fading in
+              // from the top is the cue that this is cut in, not stuck on.
+              const Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0x66000000), Colors.transparent],
+                      stops: [0.0, 0.26],
+                    ),
+                  ),
+                ),
+              ),
+              const Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [Color(0x0DFFFFFF), Colors.transparent],
+                      stops: [0.0, 0.2],
+                    ),
+                  ),
+                ),
+              ),
+              Padding(padding: padding, child: child),
+            ],
+          ),
+        ),
+      );
+    }
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
       padding: padding,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(radius),
+        borderRadius: borderRadius,
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -201,7 +272,12 @@ class ActionButton extends StatelessWidget {
   }
 }
 
-/// Square icon control used in the play screen's tool row.
+/// Flat icon control used in the play screen's tool row.
+///
+/// Sits flush against its neighbours — the row supplies the seam between
+/// tools — rather than reading as its own bordered chip. A small dot below
+/// the label stands in for the old accent border, marking a tool this level
+/// has taught.
 class ToolButton extends StatelessWidget {
   const ToolButton({
     super.key,
@@ -223,45 +299,45 @@ class ToolButton extends StatelessWidget {
         ? Palette.inkFaint
         : accent
         ? Palette.brassBright
-        : Palette.ink;
+        : Palette.inkMuted;
 
     return Semantics(
       button: true,
+      enabled: enabled,
       label: label,
-      child: Opacity(
-        opacity: enabled ? 1 : 0.4,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onPressed,
-            borderRadius: BorderRadius.circular(18),
-            child: Container(
-              width: 66,
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                color: Palette.panel,
-                border: Border.all(
-                  color: accent && enabled
-                      ? Palette.brassDim
-                      : Palette.hairline,
-                ),
-              ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          child: Opacity(
+            opacity: enabled ? 1 : 0.4,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 13),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, size: 22, color: tint),
-                  const SizedBox(height: 4),
-                  SizedBox(
-                    width: 54,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        label.toUpperCase(),
-                        maxLines: 1,
-                        style: Theme.of(context).textTheme.labelMedium
-                            ?.copyWith(color: tint, fontSize: 9),
-                      ),
+                  Icon(icon, size: 21, color: tint),
+                  const SizedBox(height: 6),
+                  Text(
+                    label.toUpperCase(),
+                    maxLines: 1,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: tint,
+                      fontSize: 10,
                     ),
+                  ),
+                  const SizedBox(height: 5),
+                  SizedBox(
+                    width: 4,
+                    height: 4,
+                    child: accent && enabled
+                        ? const DecoratedBox(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Palette.brassBright,
+                            ),
+                          )
+                        : null,
                   ),
                 ],
               ),

@@ -1,0 +1,52 @@
+# Non-localized store submission config, shared by every locale.
+# Everything here is read by tool/store/sync_store_content.dart and fanned out
+# into ios/fastlane and android/fastlane. See store/README.md for how this
+# fits together and what you still have to do by hand in each console.
+
+bundle_id: com.anotherit.quadcraft
+
+ios:
+  sku: quadcraft-001
+  primary_category: GAMES
+  primary_subcategory: GAMES_PUZZLE
+  secondary_subcategory: GAMES_BOARD
+  # App Store Connect's age-rating questionnaire. `deliver` submits these via
+  # app_rating_config_path. All "NONE" is accurate for a shape-matching puzzle
+  # with no user-generated content, ads, or in-app purchases — revisit if that
+  # changes.
+  age_rating:
+    CARTOON_FANTASY_VIOLENCE: NONE
+    REALISTIC_VIOLENCE: NONE
+    PROLONGED_GRAPHIC_SEXUAL_VIOLENCE: NONE
+    PROFANITY_CRUDE_HUMOR: NONE
+    MATURE_SUGGESTIVE: NONE
+    HORROR: NONE
+    MEDICAL_TREATMENT_INFORMATION: NONE
+    ALCOHOL_TOBACCO_DRUGS: NONE
+    GAMBLING_SIMULATED: NONE
+    CONTESTS: NONE
+    UNRESTRICTED_WEB_ACCESS: false
+    GAMBLING: false
+  # Export compliance / content rights, asked at submission time.
+  uses_encryption: false
+  contains_third_party_content: false
+  # Advertising Identifier (IDFA) usage.
+  uses_idfa: false
+
+android:
+  # Play Console → Store presence → Main store listing.
+  application_id: com.anotherit.quadcraft
+  category: GAME_PUZZLE
+  contact_email: "REPLACE_ME: support email shown on the Play listing"
+  contact_website: "REPLACE_ME: https://yourdomain.com"
+  # Play's "Content rating" questionnaire is answered through a Play Console
+  # wizard, not a flat API payload, so it isn't scriptable here — see
+  # store/README.md step 6.
+
+# Shared across both stores.
+support_url: "REPLACE_ME: https://yourdomain.com/support"
+marketing_url: "REPLACE_ME: https://yourdomain.com"
+privacy_url: "REPLACE_ME: https://yourdomain.com/privacy"
+
+pricing:
+  price_tier: free

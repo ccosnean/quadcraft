@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app_providers.dart';
 import '../../audio/sfx.dart';
 import '../../core/level/level.dart';
-import '../../core/level/levels.dart';
+import '../../core/level/level_catalog.dart';
 import '../../core/shape/shape.dart';
 import '../../core/shape/shape_ops.dart';
 import '../../data/progress_store.dart';
@@ -19,20 +19,33 @@ import '../../ui/widgets.dart';
 import 'board_stage.dart';
 import 'confetti.dart';
 import 'play_controller.dart';
+import 'shared_level_sheet.dart';
 import 'tray_strip.dart';
 import 'win_sheet.dart';
 
 class PlayScreen extends ConsumerStatefulWidget {
-  const PlayScreen({super.key, required this.levelNumber});
+  const PlayScreen({super.key, required this.level, this.movesToBeat});
 
-  final int levelNumber;
+  final LevelRef level;
 
-  static Route<void> route(int levelNumber) =>
-      MaterialPageRoute(builder: (_) => PlayScreen(levelNumber: levelNumber));
+  /// Score to beat, when the level was opened from somebody's share code.
+  /// Presentation only — it never reaches the engine or the record.
+  final int? movesToBeat;
+
+  static Route<void> route(LevelRef level, {int? movesToBeat}) =>
+      MaterialPageRoute(
+        builder: (_) => PlayScreen(level: level, movesToBeat: movesToBeat),
+      );
 
   @override
   ConsumerState<PlayScreen> createState() => _PlayScreenState();
 }
+
+/// Hairline seam between the screen's flush zones — a header, a target
+/// strip, the board, the tools and the tray all sit on one surface rather
+/// than as separate floating cards, and this is the only thing marking
+/// where one zone ends and the next begins.
+const _seam = Divider(height: 1, thickness: 1, color: Palette.hairline);
 
 class _PlayScreenState extends ConsumerState<PlayScreen> {
   final GlobalKey _boardKey = GlobalKey();
@@ -48,7 +61,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   Timer? _autoCloseTimer;
 
   PlayController get _controller =>
-      ref.read(playControllerProvider(widget.levelNumber).notifier);
+      ref.read(playControllerProvider(widget.level).notifier);
 
   @override
   void initState() {
@@ -72,7 +85,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     _autoCloseTimer?.cancel();
     _autoCloseTimer = Timer(const Duration(milliseconds: 1500), () {
       if (!mounted || !_targetIntro || _targetFlying) return;
-      final level = ref.read(playControllerProvider(widget.levelNumber)).level;
+      final level = ref.read(playControllerProvider(widget.level)).level;
       _dismissTargetIntro(level);
     });
   }
@@ -112,8 +125,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           child: _GoalPlate(
             goal: level.goal,
             side: _previewSide(context),
-            radius: 28,
-            padding: 18,
+            glow: 18,
           ),
         ),
       );
@@ -210,18 +222,27 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   Future<void> _openWinSheet(Level level) async {
     if (!mounted) return;
 
-    final state = ref.read(playControllerProvider(widget.levelNumber));
+    final state = ref.read(playControllerProvider(widget.level));
     final result = state.clear;
     if (result == null) return;
 
-    final hasNext = level.number < kLevels.length;
+    // A challenge has no "next": the depth after it belongs to a run this
+    // player is not on, so the sheet offers the seed instead of the ladder.
+    final isChallenge = widget.level.isChallenge;
+    final hasNext = !isChallenge && hasLevelAfter(level.ref);
     final action = await showModalBottomSheet<WinAction>(
       context: context,
       isDismissible: false,
       enableDrag: false,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.55),
-      builder: (_) => WinSheet(level: level, result: result, hasNext: hasNext),
+      builder: (_) => WinSheet(
+        level: level,
+        result: result,
+        hasNext: hasNext,
+        isChallenge: isChallenge,
+        movesToBeat: widget.movesToBeat,
+      ),
     );
     if (!mounted) return;
     _sheetOpen = false;
@@ -230,13 +251,35 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       case WinAction.replay:
         _controller.reset();
       case WinAction.next:
-        Navigator.of(
-          context,
-        ).pushReplacement(PlayScreen.route(level.number + 1));
+        Navigator.of(context).pushReplacement(
+          PlayScreen.route(
+            nextAfter(level.ref, seed: ref.read(diveProvider).seed),
+          ),
+        );
+      case WinAction.diveSeed:
+        await _adoptSeed(level);
       case WinAction.levels:
       case null:
         Navigator.of(context).pop();
     }
+  }
+
+  /// Takes the seed of the level just played as this player's own run, and
+  /// leaves them at the top of it.
+  Future<void> _adoptSeed(Level level) async {
+    if (!await confirmDiveThisSeed(context, ref)) {
+      // Backing out of the warning should leave the clear sheet where it was,
+      // not drop the player onto a solved board with nothing to press.
+      if (mounted) {
+        _sheetOpen = true;
+        await _openWinSheet(level);
+      }
+      return;
+    }
+    if (!mounted) return;
+    ref.read(diveProvider.notifier).useSeed(level.seed);
+    ref.read(soundBankProvider).play(Sfx.tap);
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   void _showHint(Level level) {
@@ -295,9 +338,10 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = playControllerProvider(widget.levelNumber);
+    final provider = playControllerProvider(widget.level);
     final state = ref.watch(provider);
     final level = state.level;
+    final l10n = ref.watch(l10nProvider);
 
     ref.listen(provider.select((s) => s.clear), (previous, next) {
       if (next != null && previous == null) _celebrate(level);
@@ -316,21 +360,18 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
             SafeArea(
               child: Column(
                 children: [
-                  _TopBar(
+                  _PlayHeader(
                     level: level,
+                    isChallenge: widget.level.isChallenge,
+                    movesToBeat: widget.movesToBeat,
+                    state: state,
                     canHint: state.canHint,
                     hintsRemaining: state.hintsRemaining,
                     onHint: () => _showHint(level),
+                    slotKey: _goalSlotKey,
+                    hideSlot: _targetIntro || _targetFlying,
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _GoalHeader(
-                      level: level,
-                      state: state,
-                      slotKey: _goalSlotKey,
-                      hideSlot: _targetIntro || _targetFlying,
-                    ),
-                  ),
+                  _seam,
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
@@ -362,22 +403,20 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                       ignoring: state.solved,
                       child: Column(
                         children: [
+                          _seam,
                           _ToolRow(
                             level: level,
                             state: state,
                             controller: _controller,
                           ),
-                          const SizedBox(height: 12),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-                            child: TrayStrip(
-                              shapes: state.game.tray,
-                              colors: level.colors,
-                              blockedShapeIds: blockedIds,
-                              enabled: !_flying,
-                              onPlaceShape: _placeShape,
-                              onPaint: _paintColor,
-                            ),
+                          _seam,
+                          TrayStrip(
+                            shapes: state.game.tray,
+                            colors: level.colors,
+                            blockedShapeIds: blockedIds,
+                            enabled: !_flying,
+                            onPlaceShape: _placeShape,
+                            onPaint: _paintColor,
                           ),
                         ],
                       ),
@@ -396,7 +435,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
               Positioned.fill(
                 child: _TargetIntroOverlay(
                   goal: level.goal,
-                  name: level.name,
+                  name: l10n.levelTitle(level),
                   plateKey: _introPlateKey,
                   dismissing: _targetFlying,
                   showDontAutoOpen: _autoOpened,
@@ -416,66 +455,13 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   }
 }
 
-class _TopBar extends ConsumerWidget {
-  const _TopBar({
-    required this.level,
-    required this.canHint,
-    required this.hintsRemaining,
-    required this.onHint,
-  });
+String _goalHeroTag(LevelRef ref) => 'play-goal-$ref';
 
-  final Level level;
-  final bool canHint;
-  final int hintsRemaining;
-  final VoidCallback onHint;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = ref.watch(l10nProvider);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(6, 4, 6, 8),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () => Navigator.of(context).maybePop(),
-            icon: const Icon(Icons.chevron_left_rounded, size: 30),
-            color: Palette.inkMuted,
-            tooltip: l10n.backToLevels,
-          ),
-          Expanded(
-            child: Column(
-              children: [
-                Overline(l10n.levelNumber(level.number)),
-                const SizedBox(height: 1),
-                Text(
-                  level.name,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            key: const Key('hint'),
-            onPressed: canHint ? onHint : null,
-            icon: Badge(
-              isLabelVisible: true,
-              backgroundColor: canHint ? Palette.brass : Palette.hairline,
-              textColor: canHint ? const Color(0xFF201704) : Palette.inkFaint,
-              label: Text('$hintsRemaining'),
-              child: Icon(
-                Icons.lightbulb_outline_rounded,
-                color: canHint ? Palette.inkMuted : Palette.inkFaint,
-              ),
-            ),
-            tooltip: canHint ? l10n.hint : l10n.hintGone,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-String _goalHeroTag(int levelNumber) => 'play-goal-$levelNumber';
+/// Above the title: which level of the campaign, or which band of the dive.
+String _overline(L10n l10n, Level level) => switch (level.kind) {
+  LevelKind.campaign => l10n.tutorialNumber(level.number),
+  LevelKind.endless => l10n.stratumName(level.stratum),
+};
 
 double _previewSide(BuildContext context) =>
     (MediaQuery.sizeOf(context).shortestSide * 0.72).clamp(220.0, 340.0);
@@ -485,47 +471,91 @@ Tween<Rect?> _goalRectTween(Rect? begin, Rect? end) {
   return MaterialRectArcTween(begin: begin, end: end);
 }
 
+/// The target shape shown bare — a soft brass halo standing in for the
+/// boxed plate that used to frame it. Every place "the target" appears on
+/// this screen (the header chip, the entry reveal, the enlarge dialog, and
+/// the flight between them) goes through here, so they all read as one
+/// identity.
 class _GoalPlate extends StatelessWidget {
-  const _GoalPlate({
-    required this.goal,
-    required this.side,
-    this.radius = 18,
-    this.padding = 8,
-  });
+  const _GoalPlate({required this.goal, required this.side, this.glow = 14});
 
   final Shape goal;
   final double side;
-  final double radius;
-  final double padding;
+
+  /// Radius of the halo beyond [side], in each direction.
+  final double glow;
 
   @override
   Widget build(BuildContext context) {
-    return Plate(
-      radius: radius,
-      padding: EdgeInsets.all(padding),
-      child: SizedBox.square(
-        dimension: side,
-        child: ShapeView(shape: goal, size: side),
+    return SizedBox.square(
+      dimension: side + glow * 2,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: side + glow,
+            height: side + glow,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  Palette.brass.withValues(alpha: 0.2),
+                  Palette.brass.withValues(alpha: 0),
+                ],
+              ),
+            ),
+          ),
+          ShapeView(shape: goal, size: side),
+        ],
       ),
     );
   }
 }
 
-class _GoalHeader extends ConsumerWidget {
-  const _GoalHeader({
+/// Top-of-screen chrome and the target strip, merged into one flush block:
+/// back / title / hint, then the goal glyph, brief and move count. No card —
+/// the seam below is what used to be a panel border.
+class _PlayHeader extends ConsumerWidget {
+  const _PlayHeader({
     required this.level,
+    required this.isChallenge,
+    required this.movesToBeat,
     required this.state,
+    required this.canHint,
+    required this.hintsRemaining,
+    required this.onHint,
     required this.slotKey,
     required this.hideSlot,
   });
 
   final Level level;
+  final bool isChallenge;
+
+  /// The sharer's score, on a level opened from their code.
+  final int? movesToBeat;
+
+  /// What this player already did here, if they have cleared it before.
+  ///
+  /// A challenge has none: the puzzle is on somebody else's ladder, so there
+  /// is no record of yours to beat — theirs is the only number that means
+  /// anything, and it arrives as [movesToBeat].
+  int? _personalBest(WidgetRef ref) {
+    if (isChallenge) return null;
+    return switch (level.kind) {
+      LevelKind.campaign => ref.watch(progressProvider)[level.number]?.bestMoves,
+      LevelKind.endless => ref.watch(diveProvider)[level.number]?.bestMoves,
+    };
+  }
+
   final PlayState state;
+  final bool canHint;
+  final int hintsRemaining;
+  final VoidCallback onHint;
   final Key slotKey;
   final bool hideSlot;
 
   void _openPreview(BuildContext context, L10n l10n) {
-    final tag = _goalHeroTag(level.number);
+    final tag = _goalHeroTag(level.ref);
     showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -539,7 +569,7 @@ class _GoalHeader extends ConsumerWidget {
             child: _TargetPreviewDialog(
               animation: animation,
               goal: level.goal,
-              name: level.name,
+              name: l10n.levelTitle(level),
               heroTag: tag,
             ),
           ),
@@ -551,58 +581,121 @@ class _GoalHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = ref.watch(l10nProvider);
-    return Panel(
-      padding: const EdgeInsets.fromLTRB(12, 12, 22, 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: hideSlot ? null : () => _openPreview(context, l10n),
-              borderRadius: BorderRadius.circular(18),
-              child: Tooltip(
-                message: l10n.tapToEnlarge,
-                child: Opacity(
-                  opacity: hideSlot ? 0 : 1,
-                  child: KeyedSubtree(
-                    key: slotKey,
-                    child: Hero(
-                      tag: _goalHeroTag(level.number),
-                      createRectTween: _goalRectTween,
-                      child: FittedBox(
-                        child: _GoalPlate(
-                          goal: level.goal,
-                          side: 72,
-                          radius: 18,
-                          padding: 8,
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
+          child: Row(
+            children: [
+              IconButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: const Icon(Icons.chevron_left_rounded, size: 30),
+                color: Palette.inkMuted,
+                tooltip: l10n.backToLevels,
+              ),
+              Expanded(
+                child: Column(
+                  children: [
+                    Overline(
+                      isChallenge ? l10n.sharedLevel : _overline(l10n, level),
+                      color: isChallenge ? Palette.brass : null,
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      l10n.levelTitle(level),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                key: const Key('hint'),
+                onPressed: canHint ? onHint : null,
+                icon: Badge(
+                  isLabelVisible: true,
+                  backgroundColor: canHint ? Palette.brass : Palette.hairline,
+                  textColor: canHint
+                      ? const Color(0xFF201704)
+                      : Palette.inkFaint,
+                  label: Text('$hintsRemaining'),
+                  child: Icon(
+                    Icons.lightbulb_outline_rounded,
+                    color: canHint ? Palette.inkMuted : Palette.inkFaint,
+                  ),
+                ),
+                tooltip: canHint ? l10n.hint : l10n.hintGone,
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: hideSlot ? null : () => _openPreview(context, l10n),
+                  customBorder: const CircleBorder(),
+                  child: Tooltip(
+                    message: l10n.tapToEnlarge,
+                    child: Opacity(
+                      opacity: hideSlot ? 0 : 1,
+                      child: KeyedSubtree(
+                        key: slotKey,
+                        child: Hero(
+                          tag: _goalHeroTag(level.ref),
+                          createRectTween: _goalRectTween,
+                          child: FittedBox(
+                            child: _GoalPlate(goal: level.goal, side: 60),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Overline(l10n.target),
-                const SizedBox(height: 6),
-                Text(
-                  l10n.levelBrief(level.number, level.brief),
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  maxLines: 3,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Overline(l10n.target),
+                    const SizedBox(height: 6),
+                    Text(
+                      l10n.levelLine(level),
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      maxLines: 3,
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 16),
+              // The move counter is only meaningful against a number it has
+              // to come in under, so where there is one it rides along and the
+              // readout cools off the moment it is passed. On a challenge that
+              // is the sharer's score; on anything already cleared it is the
+              // player's own, which is the same question asked of yourself.
+              Builder(
+                builder: (context) {
+                  final best = movesToBeat ?? _personalBest(ref);
+                  return Readout(
+                    label: l10n.moves,
+                    value: '${state.scoredMoves}',
+                    hint: best == null
+                        ? null
+                        : movesToBeat != null
+                        ? l10n.movesToBeat(best)
+                        : l10n.yourBest(best),
+                    highlight: best != null && state.scoredMoves < best,
+                  );
+                },
+              ),
+            ],
           ),
-          const SizedBox(width: 22),
-          Readout(label: l10n.moves, value: '${state.scoredMoves}'),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -650,12 +743,7 @@ class _TargetPreviewDialog extends ConsumerWidget {
               tag: heroTag,
               createRectTween: _goalRectTween,
               child: FittedBox(
-                child: _GoalPlate(
-                  goal: goal,
-                  side: side,
-                  radius: 28,
-                  padding: 18,
-                ),
+                child: _GoalPlate(goal: goal, side: side, glow: 18),
               ),
             ),
             const SizedBox(height: 18),
@@ -721,12 +809,7 @@ class _TargetIntroOverlay extends ConsumerWidget {
                       opacity: dismissing ? 0 : 1,
                       child: KeyedSubtree(
                         key: plateKey,
-                        child: _GoalPlate(
-                          goal: goal,
-                          side: side,
-                          radius: 28,
-                          padding: 18,
-                        ),
+                        child: _GoalPlate(goal: goal, side: side, glow: 18),
                       ),
                     ),
                     const SizedBox(height: 18),
@@ -759,6 +842,9 @@ class _TargetIntroOverlay extends ConsumerWidget {
   }
 }
 
+/// Turn / cut / undo / reset, flush in one row. Neighbours are seamed by a
+/// hairline rather than each sitting in its own bordered chip; a small dot
+/// marks a tool this level has taught, replacing the old accent border.
 class _ToolRow extends ConsumerWidget {
   const _ToolRow({
     required this.level,
@@ -774,34 +860,54 @@ class _ToolRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = ref.watch(l10nProvider);
     final board = state.game.board;
+    final tools = [
+      (
+        icon: Icons.rotate_right_rounded,
+        label: l10n.turn,
+        accent: level.canRotate,
+        onPressed: board.isEmpty ? null : controller.rotate,
+      ),
+      (
+        icon: Icons.content_cut_rounded,
+        label: l10n.cut,
+        accent: level.canCut,
+        onPressed: board.isEmpty ? null : controller.cut,
+      ),
+      (
+        icon: Icons.undo_rounded,
+        label: l10n.undo,
+        accent: false,
+        onPressed: state.canUndo ? controller.undo : null,
+      ),
+      (
+        icon: Icons.restart_alt_rounded,
+        label: l10n.reset,
+        accent: false,
+        onPressed: state.game.moves == 0 ? null : controller.reset,
+      ),
+    ];
+
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        ToolButton(
-          icon: Icons.rotate_right_rounded,
-          label: l10n.turn,
-          accent: level.canRotate,
-          onPressed: board.isEmpty ? null : controller.rotate,
-        ),
-        const SizedBox(width: 10),
-        ToolButton(
-          icon: Icons.content_cut_rounded,
-          label: l10n.cut,
-          accent: level.canCut,
-          onPressed: board.isEmpty ? null : controller.cut,
-        ),
-        const SizedBox(width: 10),
-        ToolButton(
-          icon: Icons.undo_rounded,
-          label: l10n.undo,
-          onPressed: state.canUndo ? controller.undo : null,
-        ),
-        const SizedBox(width: 10),
-        ToolButton(
-          icon: Icons.restart_alt_rounded,
-          label: l10n.reset,
-          onPressed: state.game.moves == 0 ? null : controller.reset,
-        ),
+        for (var i = 0; i < tools.length; i++) ...[
+          if (i > 0)
+            const SizedBox(
+              height: 44,
+              child: VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: Palette.hairline,
+              ),
+            ),
+          Expanded(
+            child: ToolButton(
+              icon: tools[i].icon,
+              label: tools[i].label,
+              accent: tools[i].accent,
+              onPressed: tools[i].onPressed,
+            ),
+          ),
+        ],
       ],
     );
   }

@@ -6,6 +6,7 @@ import '../../audio/sfx.dart';
 import '../../data/progress_store.dart';
 import '../../debug/objectbox_inspector_launch_export.dart';
 import '../../l10n/l10n.dart';
+import '../levels/level_select_screen.dart';
 import '../../ui/grain_background.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets.dart';
@@ -20,11 +21,13 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = ref.watch(l10nProvider);
     final muted = ref.watch(mutedProvider);
+    final music = ref.watch(musicProvider);
     final confetti = ref.watch(confettiProvider);
     final targetPreview = ref.watch(targetPreviewProvider);
     final language = ref.watch(languageProvider);
     final store = ref.watch(progressStoreProvider);
     final showInspector = canOpenObjectBoxInspector;
+    final devUnlockAll = ref.watch(devUnlockAllProvider);
 
     return Scaffold(
       body: GrainBackground(
@@ -59,12 +62,30 @@ class SettingsScreen extends ConsumerWidget {
                       Overline(l10n.sound),
                       const SizedBox(height: 10),
                       Panel(
-                        child: _ToggleRow(
-                          title: l10n.sound,
-                          subtitle: l10n.soundHint,
-                          value: !muted,
-                          onChanged: (_) =>
-                              ref.read(mutedProvider.notifier).toggle(),
+                        child: Column(
+                          children: [
+                            _ToggleRow(
+                              switchKey: const Key('sound-toggle'),
+                              title: l10n.sound,
+                              subtitle: l10n.soundHint,
+                              value: !muted,
+                              onChanged: (_) =>
+                                  ref.read(mutedProvider.notifier).toggle(),
+                            ),
+                            const SizedBox(height: 14),
+                            // Sits under the sound switch, and reads as
+                            // switched off while everything is muted, because
+                            // that is what the player is hearing.
+                            _ToggleRow(
+                              switchKey: const Key('music-toggle'),
+                              title: l10n.music,
+                              subtitle: l10n.musicHint,
+                              value: music && !muted,
+                              enabled: !muted,
+                              onChanged: (_) =>
+                                  ref.read(musicProvider.notifier).toggle(),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 22),
@@ -169,6 +190,33 @@ class SettingsScreen extends ConsumerWidget {
                           ],
                         ),
                       ),
+                      const SizedBox(height: 22),
+                      Overline(l10n.tutorial),
+                      const SizedBox(height: 10),
+                      Panel(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.tutorialHint,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 14),
+                            ActionButton(
+                              key: const Key('replay-tutorial'),
+                              label: l10n.replayTutorial,
+                              icon: Icons.school_rounded,
+                              expand: true,
+                              onPressed: () {
+                                ref.read(soundBankProvider).play(Sfx.tap);
+                                Navigator.of(
+                                  context,
+                                ).push(LevelSelectScreen.tutorial());
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
                       if (showInspector) ...[
                         const SizedBox(height: 22),
                         const Overline('Debug'),
@@ -177,6 +225,21 @@ class SettingsScreen extends ConsumerWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              _ToggleRow(
+                                switchKey: const Key('dev-unlock-toggle'),
+                                title: 'Unlock everything',
+                                subtitle:
+                                    'Every tutorial level and generated '
+                                    'depth opens regardless of progress. '
+                                    'Debug builds only.',
+                                value: devUnlockAll,
+                                onChanged: (value) => ref
+                                    .read(devUnlockAllProvider.notifier)
+                                    .set(value),
+                              ),
+                              const SizedBox(height: 14),
+                              const Divider(height: 1, color: Palette.hairline),
+                              const SizedBox(height: 14),
                               Text(
                                 'Browse and edit the ObjectBox store on this device.',
                                 style: Theme.of(context).textTheme.bodySmall,
@@ -286,6 +349,8 @@ class _ToggleRow extends StatelessWidget {
     required this.subtitle,
     required this.value,
     required this.onChanged,
+    this.switchKey,
+    this.enabled = true,
   });
 
   final String title;
@@ -293,31 +358,43 @@ class _ToggleRow extends StatelessWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
 
+  /// A row whose setting is currently overridden by another one above it. It
+  /// keeps its place and its value, but greys out and stops responding.
+  final bool enabled;
+
+  /// Key on the interactive [Switch] itself, so a test can find and tap this
+  /// exact row's control even though several rows share this widget.
+  final Key? switchKey;
+
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 4),
-              Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-            ],
+    final theme = Theme.of(context);
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.45,
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(subtitle, style: theme.textTheme.bodySmall),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Switch(
-          key: const Key('sound-toggle'),
-          value: value,
-          onChanged: onChanged,
-          activeThumbColor: Palette.brassBright,
-          activeTrackColor: Palette.brassDim,
-          inactiveThumbColor: Palette.inkMuted,
-          inactiveTrackColor: Palette.panelSunken,
-        ),
-      ],
+          const SizedBox(width: 12),
+          Switch(
+            key: switchKey,
+            value: value,
+            onChanged: enabled ? onChanged : null,
+            activeThumbColor: Palette.brassBright,
+            activeTrackColor: Palette.brassDim,
+            inactiveThumbColor: Palette.inkMuted,
+            inactiveTrackColor: Palette.panelSunken,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -385,6 +462,15 @@ class _ResetDialogState extends ConsumerState<_ResetDialog> {
   Widget build(BuildContext context) {
     final l10n = ref.watch(l10nProvider);
     final cleared = ref.watch(progressProvider).clearedCount;
+    final dive = ref.watch(diveProvider);
+    // Erasing takes the dive with it, so the second step has to name what
+    // else is on the table rather than only counting campaign levels.
+    final diveLosses = <String>[
+      if (dive.discoveries.isNotEmpty)
+        '${l10n.collection} · ${l10n.builtCount(dive.discoveries.length)}',
+      if (dive.deepest > 0)
+        '${l10n.deepest} · ${l10n.depthLabel(dive.deepest)}',
+    ];
 
     final title = switch (_step) {
       0 => l10n.resetStep1Title,
@@ -418,6 +504,16 @@ class _ResetDialogState extends ConsumerState<_ResetDialog> {
             Text(title, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(body, style: Theme.of(context).textTheme.bodyMedium),
+            if (_step == 1 && diveLosses.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              for (final loss in diveLosses)
+                Text(
+                  loss,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Palette.danger),
+                ),
+            ],
             if (_step == 1) ...[
               const SizedBox(height: 16),
               Material(

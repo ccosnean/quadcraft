@@ -3,6 +3,21 @@
 
 Everything here is generated from scratch (no sampled material), so the audio
 ships with the app without third-party licensing.
+
+Every pitched layer is written in note names from `tool/pitch.py`, the same
+table `tool/gen_music.py` builds the pad from, because these sounds are heard
+over sustained music and an effect a semitone off the pad reads as a mistake.
+The old round numbers - 1250, 320, 480 - were 35 to 50 cents from any note,
+which is close enough to nothing to sound untuned once a pad is holding a
+chord underneath.
+
+One thing to know before retuning anything here: with envelopes this fast the
+pitch you hear is where a glide STARTS, not where it ends. `drop` sweeps G3 to
+C2, but it is 40 dB down by the time it reaches C2 - 94% of its energy is in
+120-260 Hz, around the G. The landing is felt as weight, not heard as a note.
+So the opening pitch is the one that has to be in key; the fall is a gesture.
+
+`blocked` is the one sound deliberately left out of key. It means no.
 """
 
 import math
@@ -10,6 +25,8 @@ import os
 import random
 import struct
 import wave
+
+from pitch import describe, is_in_key, note
 
 SR = 44100
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "sfx")
@@ -113,8 +130,8 @@ def apply(sig, e):
 def rotate():
     n = int(0.10 * SR)
     click = apply(highpass(noise(n, 11), 1800), env(n, 0.0004, 26, 3.0))
-    body = apply(tone(n, 1250, 860), env(n, 0.001, 18))
-    sub = apply(tone(n, 320, 240), env(n, 0.001, 22))
+    body = apply(tone(n, note("e6"), note("a5")), env(n, 0.001, 18))
+    sub = apply(tone(n, note("e4"), note("a3")), env(n, 0.001, 22))
     return mix([c * 0.55 for c in click], [b * 0.45 for b in body], [s * 0.3 for s in sub])
 
 
@@ -128,16 +145,19 @@ def cut():
     snip2 = apply(highpass(noise(n - off, 1600), 1200), env(n - off, 0.0005, 30, 3.0))
     for i, v in enumerate(snip2):
         second[off + i] = v * 0.7
-    ring = apply(tone(n, 2100, 1500), env(n, 0.001, 26))
+    ring = apply(tone(n, note("c7"), note("g6")), env(n, 0.001, 26))
     return mix([h * 0.8 for h in hiss], second, [r * 0.25 for r in ring])
 
 
 # --- drop: weighted thud with a small snap ----------------------------------
 def drop():
     n = int(0.26 * SR)
-    thud = apply(tone(n, 190, 62, harmonics=(1.0, 0.25)), env(n, 0.002, 9))
+    thud = apply(
+        tone(n, note("g3"), note("c2"), harmonics=(1.0, 0.25)),
+        env(n, 0.002, 9),
+    )
     snap = apply(highpass(noise(n, 37), 2400), env(n, 0.0004, 34, 3.0))
-    wood = apply(tone(n, 520, 300), env(n, 0.001, 20))
+    wood = apply(tone(n, note("c5"), note("e4")), env(n, 0.001, 20))
     return mix(thud, [s * 0.28 for s in snap], [w * 0.22 for w in wood])
 
 
@@ -147,7 +167,10 @@ def paint():
     cutoff = [700 + 5200 * math.sin(math.pi * (i / n)) for i in range(n)]
     air = lowpass(highpass(noise(n, 51), 400), cutoff)
     shaped = [air[i] * (math.sin(math.pi * (i / n)) ** 1.6) for i in range(n)]
-    shimmer = apply(tone(n, 620, 1500, harmonics=(1.0, 0.4, 0.2)), env(n, 0.05, 5))
+    shimmer = apply(
+        tone(n, note("d5"), note("g6"), harmonics=(1.0, 0.4, 0.2)),
+        env(n, 0.05, 5),
+    )
     return mix([s * 0.9 for s in shaped], [s * 0.16 for s in shimmer])
 
 
@@ -155,8 +178,9 @@ def paint():
 def win():
     total = int(1.25 * SR)
     out = [0.0] * total
-    # C5 E5 G5 C6 - simple, bright, resolved.
-    for idx, freq in enumerate((523.25, 659.25, 783.99, 1046.50)):
+    # C5 E5 G5 C6 - simple, bright, resolved. The reference the rest of
+    # the game, and the pad, are tuned to.
+    for idx, freq in enumerate(note(p) for p in ("c5", "e5", "g5", "c6")):
         start = int(idx * 0.085 * SR)
         n = total - start
         bell = apply(
@@ -172,24 +196,53 @@ def win():
 # --- tap: soft UI tick ------------------------------------------------------
 def tap():
     n = int(0.07 * SR)
+    # Weighted towards the click rather than the body. A 70 ms sine at 880 Hz
+    # is the easiest thing in the game for a sustained pad to swallow, and this
+    # is the sound that confirms a button was pressed.
     click = apply(highpass(noise(n, 83), 2600), env(n, 0.0004, 40, 3.0))
-    body = apply(tone(n, 900, 700), env(n, 0.0008, 30))
-    return mix([c * 0.4 for c in click], [b * 0.5 for b in body])
+    body = apply(tone(n, note("a6"), note("e6")), env(n, 0.0008, 30))
+    return mix([c * 0.62 for c in click], [b * 0.5 for b in body])
 
 
 # --- pickup: rising blip when a drag starts ---------------------------------
 def pickup():
     n = int(0.11 * SR)
-    blip = apply(tone(n, 480, 980, harmonics=(1.0, 0.2)), env(n, 0.004, 12))
+    blip = apply(
+        tone(n, note("b4"), note("b5"), harmonics=(1.0, 0.2)),
+        env(n, 0.004, 12),
+    )
     return [b * 0.8 for b in blip]
 
 
 # --- blocked: dull refusal --------------------------------------------------
+# Eb and Bb, the only pitches in the game outside the key. Note that being out
+# of key is not by itself enough to grate: roughness is a matter of absolute
+# distance in Hz, so a tritone parked an octave below the pad is smoother than
+# an in-key note sitting inside it. These land in the register where the pad's
+# own notes are, which is the only place a wrong note is felt as one.
 def blocked():
     n = int(0.20 * SR)
-    buzz = apply(tone(n, 150, 120, harmonics=(1.0, 0.5, 0.3)), env(n, 0.003, 11))
+    buzz = apply(
+        tone(n, note("d#3"), note("a#2"), harmonics=(1.0, 0.5, 0.3)),
+        env(n, 0.003, 11),
+    )
     grit = apply(lowpass(noise(n, 97), 900), env(n, 0.002, 16))
     return mix(buzz, [g * 0.35 for g in grit])
+
+
+# What each verb says, musically. Printed on every run so the reasoning stays
+# in front of whoever regenerates these, rather than only in the commit that
+# introduced it.
+VOICING = (
+    ("rotate", ("e6", "a5"), "falling fifth, doubled two octaves down"),
+    ("cut", ("c7", "g6"), "falling fourth - down reads as severed"),
+    ("drop", ("g3", "c2"), "opens on the dominant; the fall is weight"),
+    ("paint", ("d5", "g6"), "rising - up reads as spreading"),
+    ("win", ("c5", "e5", "g5", "c6"), "the tonic chord, and the key itself"),
+    ("tap", ("a6", "e6"), "falling fourth, above the bells"),
+    ("pickup", ("b4", "b5"), "leading tone: held, not yet placed"),
+    ("blocked", ("d#3", "a#2"), "out of key, and close enough to beat"),
+)
 
 
 if __name__ == "__main__":
@@ -199,6 +252,10 @@ if __name__ == "__main__":
     write("drop.wav", drop(), peak=0.8)
     write("paint.wav", paint(), peak=0.62)
     write("win.wav", win(), peak=0.8)
-    write("tap.wav", tap(), peak=0.5)
+    write("tap.wav", tap(), peak=0.72)
     write("pickup.wav", pickup(), peak=0.5)
     write("blocked.wav", blocked(), peak=0.6)
+    print()
+    for name, names, why in VOICING:
+        flag = "" if all(is_in_key(n) for n in names) else "  <- out of key"
+        print("%-9s %-22s %s%s" % (name, describe(*names), why, flag))

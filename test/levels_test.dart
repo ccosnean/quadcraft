@@ -14,27 +14,33 @@ void main() {
     expect(kLevels.length, greaterThanOrEqualTo(15));
   });
 
-  test('post-tutorial sections get longer', () {
-    final sections = kLevelSections
-        .where((entry) => !entry.key.startsWith('Tutorial'))
-        .toList();
-    expect(sections.length, greaterThanOrEqualTo(2));
-    double? previousAvg;
-    for (final entry in sections) {
-      final avg =
-          entry.value.map((level) => level.parMoves).reduce((a, b) => a + b) /
-          entry.value.length;
-      if (previousAvg != null) {
-        expect(
-          avg,
-          greaterThan(previousAvg),
-          reason:
-              '${entry.key} avg par ${avg.toStringAsFixed(1)} '
-              'should exceed previous ${previousAvg.toStringAsFixed(1)}',
-        );
-      }
-      previousAvg = avg;
+  test('the tutorial teaches one verb at a time, then hands over', () {
+    // Every section is tutorial now: the generated ladder takes over from
+    // here, so this set exists purely to leave the player holding the whole
+    // vocabulary.
+    for (final entry in kLevelSections) {
+      expect(entry.key, startsWith('Tutorial'), reason: entry.key);
+      expect(entry.value, isNotEmpty, reason: entry.key);
     }
+    expect(kLevelSections.length, greaterThanOrEqualTo(5));
+
+    // Reference lines get longer across the tutorial as verbs accumulate.
+    final first = kLevels
+        .take(6)
+        .map((l) => l.parMoves)
+        .reduce((a, b) => a + b);
+    final last = kLevels
+        .skip(kLevels.length - 6)
+        .map((l) => l.parMoves)
+        .reduce((a, b) => a + b);
+    expect(last, greaterThan(first));
+  });
+
+  test('the tutorial covers every verb the generator uses', () {
+    expect(kLevels.any((l) => l.canRotate), isTrue);
+    expect(kLevels.any((l) => l.canCut), isTrue);
+    expect(kLevels.any((l) => l.colors.isNotEmpty), isTrue);
+    expect(kLevels.any((l) => l.solution.any((m) => m is StackMove)), isTrue);
   });
 
   group('every shipped level', () {

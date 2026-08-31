@@ -103,6 +103,20 @@ abstract final class AppTheme {
       fontFamily: body,
       fontFamilyFallback: fallbacks,
       splashFactory: InkSparkle.splashFactory,
+      // Material's default snack bar inverts the surface, which on a dark
+      // theme paints dark text on a dark panel and reads as nothing at all.
+      snackBarTheme: const SnackBarThemeData(
+        backgroundColor: Palette.panelRaised,
+        contentTextStyle: TextStyle(
+          fontFamily: body,
+          fontFamilyFallback: fallbacks,
+          color: Palette.ink,
+          fontSize: 14,
+        ),
+        actionTextColor: Palette.brassBright,
+        behavior: SnackBarBehavior.floating,
+        elevation: 6,
+      ),
       textTheme: TextTheme(
         displayLarge: const TextStyle(
           fontFamily: display,

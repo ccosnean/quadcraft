@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:quadcraft/core/level/level.dart';
 import 'package:quadcraft/app_providers.dart';
 import 'package:quadcraft/audio/sfx.dart';
 import 'package:quadcraft/core/level/levels.dart';
@@ -49,7 +50,9 @@ void main() {
   testWidgets('opening a level shows the target then heroes it into the HUD', (
     tester,
   ) async {
-    await tester.pumpWidget(host(const PlayScreen(levelNumber: 1)));
+    await tester.pumpWidget(
+      host(const PlayScreen(level: LevelRef.campaign(1))),
+    );
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byKey(const Key('target-intro')), findsOneWidget);
@@ -75,7 +78,9 @@ void main() {
   testWidgets('turning the plate solves level 1 and records the clear', (
     tester,
   ) async {
-    await tester.pumpWidget(host(const PlayScreen(levelNumber: 1)));
+    await tester.pumpWidget(
+      host(const PlayScreen(level: LevelRef.campaign(1))),
+    );
     await tester.pump(const Duration(milliseconds: 100));
     await dismissTargetIntro(tester);
 
@@ -99,7 +104,9 @@ void main() {
   testWidgets('tapping blueprints places them and counts moves', (
     tester,
   ) async {
-    await tester.pumpWidget(host(const PlayScreen(levelNumber: 5)));
+    await tester.pumpWidget(
+      host(const PlayScreen(level: LevelRef.campaign(5))),
+    );
     await tester.pump(const Duration(milliseconds: 100));
     await dismissTargetIntro(tester);
 
@@ -125,7 +132,9 @@ void main() {
   testWidgets('undo walks the board back and reset clears the run', (
     tester,
   ) async {
-    await tester.pumpWidget(host(const PlayScreen(levelNumber: 10)));
+    await tester.pumpWidget(
+      host(const PlayScreen(level: LevelRef.campaign(10))),
+    );
     await tester.pump(const Duration(milliseconds: 100));
     await dismissTargetIntro(tester);
 
@@ -136,7 +145,7 @@ void main() {
     final container = ProviderScope.containerOf(
       tester.element(find.byType(PlayScreen)),
     );
-    final provider = playControllerProvider(10);
+    final provider = playControllerProvider(LevelRef.campaign(10));
     expect(container.read(provider).game.moves, 1);
     expect(container.read(provider).game.board.isEmpty, isFalse);
 
@@ -155,25 +164,37 @@ void main() {
 
   testWidgets('a refused drop keeps the move count still', (tester) async {
     // Layer Cap fills one quadrant to the limit, so a fifth drop must bounce.
-    await tester.pumpWidget(host(const PlayScreen(levelNumber: 12)));
+    await tester.pumpWidget(
+      host(const PlayScreen(level: LevelRef.campaign(12))),
+    );
     await tester.pump(const Duration(milliseconds: 100));
     await dismissTargetIntro(tester);
 
     final container = ProviderScope.containerOf(
       tester.element(find.byType(PlayScreen)),
     );
-    final controller = container.read(playControllerProvider(12).notifier);
-    final level = container.read(playControllerProvider(12)).level;
+    final controller = container.read(
+      playControllerProvider(LevelRef.campaign(12)).notifier,
+    );
+    final level = container
+        .read(playControllerProvider(LevelRef.campaign(12)))
+        .level;
     for (final shape in level.tray) {
       controller.drop(shape);
       await tester.pump(const Duration(milliseconds: 350));
     }
     // Board is solved at four layers; a further drop is ignored outright.
-    final movesAtCap = container.read(playControllerProvider(12)).game.moves;
+    final movesAtCap = container
+        .read(playControllerProvider(LevelRef.campaign(12)))
+        .game
+        .moves;
     expect(movesAtCap, 4);
     controller.drop(level.tray.first);
     await tester.pump(const Duration(milliseconds: 350));
-    expect(container.read(playControllerProvider(12)).game.moves, movesAtCap);
+    expect(
+      container.read(playControllerProvider(LevelRef.campaign(12))).game.moves,
+      movesAtCap,
+    );
   });
 
   testWidgets('level select locks everything past the frontier', (
@@ -182,7 +203,9 @@ void main() {
     await tester.pumpWidget(host(const LevelSelectScreen()));
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Levels'), findsOneWidget);
+    // Until the lessons are done there is no ladder, so the list is the
+    // lessons and says so.
+    expect(find.text('Tutorial'), findsOneWidget);
     expect(find.text('0 / ${kLevels.length}'), findsOneWidget);
     expect(find.text('First Turn'), findsOneWidget);
     // Only the first level is reachable on a fresh save.
@@ -230,6 +253,8 @@ void main() {
     await tester.pump();
     expect(store.confetti, ConfettiAmount.off);
 
+    await tester.ensureVisible(find.byKey(const Key('target-preview-manual')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('target-preview-manual')));
     await tester.pump();
     expect(store.targetPreview, TargetPreviewMode.manual);
@@ -294,14 +319,16 @@ void main() {
   });
 
   testWidgets('hint is capped and adds a move', (tester) async {
-    await tester.pumpWidget(host(const PlayScreen(levelNumber: 1)));
+    await tester.pumpWidget(
+      host(const PlayScreen(level: LevelRef.campaign(1))),
+    );
     await tester.pump(const Duration(milliseconds: 100));
     await dismissTargetIntro(tester);
 
     final container = ProviderScope.containerOf(
       tester.element(find.byType(PlayScreen)),
     );
-    final provider = playControllerProvider(1);
+    final provider = playControllerProvider(LevelRef.campaign(1));
 
     for (var i = 0; i < kMaxHintsPerLevel; i++) {
       await tester.tap(find.byKey(const Key('hint')));

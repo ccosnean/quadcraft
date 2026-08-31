@@ -134,6 +134,7 @@ class _BoardStageState extends State<BoardStage> with TickerProviderStateMixin {
           child: Transform.scale(
             scale: pop,
             child: Plate(
+              sunken: true,
               glow: glow,
               glowColor: solvePulse > widget.dropGlow
                   ? Palette.brassBright

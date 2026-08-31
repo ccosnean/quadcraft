@@ -8,7 +8,7 @@
 PRODUCT_NAME = Quadcraft
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.quadcraft.quadcraft
+PRODUCT_BUNDLE_IDENTIFIER = com.anotherit.quadcraft
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.quadcraft. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 com.anotherit. All rights reserved.

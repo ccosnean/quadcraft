@@ -3,19 +3,31 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../app_providers.dart';
+import '../../audio/sfx.dart';
 import '../../core/level/level.dart';
+import '../../core/share/share_code.dart';
+import '../../l10n/l10n.dart';
+import '../../ui/qr_view.dart';
 import '../../ui/shape_painter.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets.dart';
 
 /// Pixel size of the exported share image (portrait, story-friendly).
 const Size kShareCardSize = Size(1080, 1350);
+
+/// Line above the title on the share card: the chapter for a campaign level,
+/// the band of the dive for a generated one.
+String _shareOverline(L10n l10n, Level level) => switch (level.kind) {
+  LevelKind.campaign => l10n.tutorialNumber(level.number),
+  LevelKind.endless => l10n.stratumName(level.stratum),
+};
 
 /// Branded score card rendered into a PNG for sharing.
 class ShareCard extends ConsumerWidget {
@@ -84,7 +96,7 @@ class ShareCard extends ConsumerWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  l10n.levelNumber(level.number).toUpperCase(),
+                  _shareOverline(l10n, level).toUpperCase(),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontFamily: AppTheme.body,
@@ -96,7 +108,7 @@ class ShareCard extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  level.name,
+                  l10n.levelTitle(level),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontFamily: AppTheme.display,
@@ -133,10 +145,7 @@ class ShareCard extends ConsumerWidget {
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 36,
-                    vertical: 28,
-                  ),
+                  padding: const EdgeInsets.fromLTRB(36, 26, 26, 26),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(28),
                     color: Palette.panelSunken.withValues(alpha: 0.92),
@@ -149,6 +158,7 @@ class ShareCard extends ConsumerWidget {
                     children: [
                       Expanded(
                         child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
@@ -170,34 +180,38 @@ class ShareCard extends ConsumerWidget {
                                 color: Palette.brassBright,
                               ),
                             ),
+                            if (isNewBest) ...[
+                              const SizedBox(height: 14),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  color: Palette.brass.withValues(alpha: 0.18),
+                                  border: Border.all(color: Palette.brassDim),
+                                ),
+                                child: Text(
+                                  l10n.newBest.toUpperCase(),
+                                  style: TextStyle(
+                                    fontFamily: track
+                                        ? AppTheme.display
+                                        : AppTheme.body,
+                                    fontFamilyFallback: AppTheme.fallbacks,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 18,
+                                    letterSpacing: track ? 2 : 0,
+                                    color: Palette.brassBright,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
-                      if (isNewBest)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            color: Palette.brass.withValues(alpha: 0.18),
-                            border: Border.all(color: Palette.brassDim),
-                          ),
-                          child: Text(
-                            l10n.newBest.toUpperCase(),
-                            style: TextStyle(
-                              fontFamily: track
-                                  ? AppTheme.display
-                                  : AppTheme.body,
-                              fontFamilyFallback: AppTheme.fallbacks,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 18,
-                              letterSpacing: track ? 2 : 0,
-                              color: Palette.brassBright,
-                            ),
-                          ),
-                        ),
+                      const SizedBox(width: 20),
+                      _ShareTag(level: level, moves: moves, l10n: l10n),
                     ],
                   ),
                 ),
@@ -213,6 +227,68 @@ class ShareCard extends ConsumerWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The half of the card that is machine-readable: the exact level, as a code
+/// a friend can type and a QR their camera can take straight off the screen.
+///
+/// Both carry the same thing, because a share image outlives whatever we can
+/// resolve for it — a scan opens the level where there is a host to open it
+/// on, and the printed code below always works by hand.
+class _ShareTag extends StatelessWidget {
+  const _ShareTag({
+    required this.level,
+    required this.moves,
+    required this.l10n,
+  });
+
+  final Level level;
+  final int moves;
+  final L10n l10n;
+
+  static const double _side = 200;
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = level.ref;
+    return SizedBox(
+      width: _side,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          QrView(
+            data: ShareCode.payload(ref, moves: moves),
+            size: _side,
+            radius: 16,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            ShareCode.encode(ref, moves: moves),
+            maxLines: 1,
+            style: AppTheme.monoDigits.copyWith(
+              fontSize: 24,
+              height: 1,
+              color: Palette.brassBright,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            l10n.scanToPlay,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            style: const TextStyle(
+              fontFamily: AppTheme.body,
+              fontFamilyFallback: AppTheme.fallbacks,
+              fontWeight: FontWeight.w400,
+              fontSize: 17,
+              height: 1.25,
+              color: Palette.inkFaint,
             ),
           ),
         ],
@@ -256,7 +332,20 @@ class _ShareScoreSheet extends ConsumerStatefulWidget {
 class _ShareScoreSheetState extends ConsumerState<_ShareScoreSheet> {
   final GlobalKey _cardKey = GlobalKey();
   bool _busy = false;
+  bool _copied = false;
   String? _error;
+
+  /// What a friend needs to open this exact level: the link once there is a
+  /// host for one, the typed code until then.
+  String get _handoff =>
+      ShareCode.payload(widget.level.ref, moves: widget.moves);
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: _handoff));
+    if (!mounted) return;
+    ref.read(soundBankProvider).play(Sfx.tap);
+    setState(() => _copied = true);
+  }
 
   Future<void> _share() async {
     if (_busy) return;
@@ -265,6 +354,7 @@ class _ShareScoreSheetState extends ConsumerState<_ShareScoreSheet> {
       _error = null;
     });
 
+    final l10n = ref.read(l10nProvider);
     final box = context.findRenderObject() as RenderBox?;
     final origin = box == null
         ? null
@@ -287,22 +377,28 @@ class _ShareScoreSheetState extends ConsumerState<_ShareScoreSheet> {
       final file = File(
         p.join(
           dir.path,
-          'quadcraft-L${widget.level.number}-${widget.moves}moves.png',
+          widget.level.kind == LevelKind.endless
+              ? 'quadcraft-depth${widget.level.number}-'
+                    '${widget.moves}moves.png'
+              : 'quadcraft-L${widget.level.number}-${widget.moves}moves.png',
         ),
       );
       await file.writeAsBytes(bytes.buffer.asUint8List(), flush: true);
 
+      // Someone reading the message rather than the picture still needs a way
+      // in: the link where there is one, the typed code where there is not.
+      final handoff =
+          ShareCode.link(widget.level.ref, moves: widget.moves) != null
+          ? _handoff
+          : '${l10n.playShared}: $_handoff';
+
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(file.path, mimeType: 'image/png')],
-          text: ref
-              .read(l10nProvider)
-              .shareCaption(
-                widget.level.number,
-                widget.level.name,
-                widget.moves,
-              ),
-          subject: 'Quadcraft · ${widget.level.name}',
+          text:
+              '${l10n.shareCaption(widget.level.number, l10n.levelTitle(widget.level), widget.moves)}'
+              '\n\n$handoff',
+          subject: 'Quadcraft · ${l10n.levelTitle(widget.level)}',
           sharePositionOrigin: origin,
         ),
       );
@@ -403,13 +499,44 @@ class _ShareScoreSheetState extends ConsumerState<_ShareScoreSheet> {
                   ).textTheme.bodySmall?.copyWith(color: Palette.danger),
                 ),
               ],
-              const SizedBox(height: 16),
-              ActionButton(
-                label: _busy ? l10n.preparing : l10n.shareImage,
-                icon: Icons.ios_share_rounded,
-                primary: true,
-                expand: true,
-                onPressed: _busy ? null : _share,
+              const SizedBox(height: 14),
+              // The picture is the thing worth posting, but it cannot be
+              // pasted into a chat window, so the code goes out on its own too.
+              Text(
+                ShareCode.encode(widget.level.ref, moves: widget.moves),
+                textAlign: TextAlign.center,
+                style: AppTheme.monoDigits.copyWith(
+                  fontSize: 18,
+                  color: Palette.brassBright,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ActionButton(
+                      key: const Key('share-copy'),
+                      label: _copied ? l10n.copied : l10n.copy,
+                      icon: _copied
+                          ? Icons.check_rounded
+                          : Icons.copy_all_rounded,
+                      expand: true,
+                      onPressed: _copy,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ActionButton(
+                      key: const Key('share-image'),
+                      label: _busy ? l10n.preparing : l10n.shareImage,
+                      icon: Icons.ios_share_rounded,
+                      primary: true,
+                      expand: true,
+                      onPressed: _busy ? null : _share,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

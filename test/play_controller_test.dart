@@ -11,9 +11,10 @@ void main() {
   late MemoryProgressStore store;
 
   PlayController controller(int level) =>
-      container.read(playControllerProvider(level).notifier);
+      container.read(playControllerProvider(LevelRef.campaign(level)).notifier);
 
-  PlayState play(int level) => container.read(playControllerProvider(level));
+  PlayState play(int level) =>
+      container.read(playControllerProvider(LevelRef.campaign(level)));
 
   setUp(() {
     store = MemoryProgressStore();

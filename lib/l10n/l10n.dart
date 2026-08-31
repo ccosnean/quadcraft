@@ -2,10 +2,13 @@ import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/material.dart';
 
+import '../core/level/endless/endless_levels.dart';
+import '../core/level/level.dart';
 import '../core/shape/shape.dart';
 import 'level_briefs.dart';
 
 part 'copy.dart';
+part 'dive_copy.dart';
 
 enum AppLanguage {
   en('en', 'English'),
@@ -102,12 +105,98 @@ class L10n {
     AppLanguage.ro => kCopyRo,
   };
 
+  DiveCopy get _d => switch (language) {
+    AppLanguage.en => kDiveEn,
+    AppLanguage.zh => kDiveZh,
+    AppLanguage.hi => kDiveHi,
+    AppLanguage.es => kDiveEs,
+    AppLanguage.ar => kDiveAr,
+    AppLanguage.pt => kDivePt,
+    AppLanguage.fr => kDiveFr,
+    AppLanguage.id => kDiveId,
+    AppLanguage.ja => kDiveJa,
+    AppLanguage.de => kDiveDe,
+    AppLanguage.ko => kDiveKo,
+    AppLanguage.ru => kDiveRu,
+    AppLanguage.ro => kDiveRo,
+  };
+
   /// Flavour line under the target. English lives on the level; the others
   /// follow the UI language.
   String levelBrief(int number, String english) {
     if (language == AppLanguage.en) return english;
     return kLevelBriefs[language.code]?[number] ?? english;
   }
+
+  /// Title shown in the play HUD. Campaign levels carry an authored name;
+  /// a generated one is named by how deep it sits.
+  String levelTitle(Level level) => switch (level.kind) {
+    LevelKind.campaign => level.name,
+    LevelKind.endless => depthLabel(level.number),
+  };
+
+  /// Chapter line above the title.
+  String levelSection(Level level) => switch (level.kind) {
+    LevelKind.campaign => level.section,
+    LevelKind.endless => stratumName(level.stratum),
+  };
+
+  /// The line under the target, whichever side of the game it came from.
+  String levelLine(Level level) {
+    final theme = level.theme;
+    if (theme != null) return themeBrief(theme);
+    return levelBrief(level.number, level.brief);
+  }
+
+  String depthLabel(int n) =>
+      _fill(_d.depthLabel, {'n': n.toString().padLeft(2, '0')});
+
+  /// Bands of the dive cycle through six names; past the sixth they take a
+  /// numeral, so depth 100 still lands somewhere with a name.
+  String stratumName(int stratum) {
+    final names = _d.strata;
+    final name = names[stratum % names.length];
+    final cycle = stratum ~/ names.length;
+    return cycle == 0 ? name : '$name ${cycle + 1}';
+  }
+
+  String themeBrief(LevelTheme theme) =>
+      _d.themes[theme] ?? EndlessLevels.briefFor(theme);
+
+  String get deepest => _d.deepest;
+  String get collection => _d.collection;
+  String get seedLabel => _d.seedLabel;
+  String get seedHint => _d.seedHint;
+  String get seedRandom => _d.seedRandom;
+  String get seedDefault => _d.seedDefault;
+  String get seedBody => _d.seedBody;
+  String get diveLocked => _d.diveLocked;
+  String get nextDepth => _d.nextDepth;
+  String get deepestYet => _d.deepestYet;
+  String get newFind => _d.newFind;
+  String get freeExplorer => _d.freeExplorer;
+  String get freeExplorerNote => _d.freeExplorerNote;
+  String get sharedLevel => _d.sharedLevel;
+  String get playShared => _d.playShared;
+  String get shareCodeHint => _d.shareCodeHint;
+  String get shareCodeBad => _d.shareCodeBad;
+  String get scanToPlay => _d.scanToPlay;
+  String get beatenIt => _d.beatenIt;
+  String get sharedNotCounted => _d.sharedNotCounted;
+  String get diveThisSeed => _d.diveThisSeed;
+  String get diveThisSeedBody => _d.diveThisSeedBody;
+
+  String movesToBeat(int n) => _fill(_d.movesToBeat, {'n': '$n'});
+
+  String get goDeeperHint => _d.goDeeperHint;
+  String get useKey => _d.useKey;
+  String get outOfKeys => _d.outOfKeys;
+  String get openedWithKey => _d.openedWithKey;
+  String get keyWon => _d.keyWon;
+
+  String builtCount(int n) => _fill(_d.builtCount, {'n': '$n'});
+
+  String clearedThisRun(int n) => _fill(_d.clearedThisRun, {'n': '$n'});
 
   String get settings => _c.settings;
   String get tagline => _c.tagline;
@@ -117,6 +206,8 @@ class L10n {
   String get unmute => _c.unmute;
   String get sound => _c.sound;
   String get soundHint => _c.soundHint;
+  String get music => _c.music;
+  String get musicHint => _c.musicHint;
   String get confettiLabel => _c.confettiLabel;
   String get confettiHint => _c.confettiHint;
   String get confettiFull => _c.confettiFull;
@@ -144,6 +235,12 @@ class L10n {
   String get keepProgress => _c.keepProgress;
   String get eraseEverything => _c.eraseEverything;
   String get resetDone => _c.resetDone;
+  String get tutorial => _c.tutorial;
+  String get skipTutorial => _c.skipTutorial;
+  String get replayTutorial => _c.replayTutorial;
+  String get tutorialHint => _c.tutorialHint;
+  String get copy => _c.copy;
+  String get copied => _c.copied;
   String get levels => _c.levels;
   String get locked => _c.locked;
   String get backToLevels => _c.backToLevels;
@@ -179,16 +276,18 @@ class L10n {
   String get preparing => _c.preparing;
   String get shareImage => _c.shareImage;
 
-  String continueLevel(int n) =>
-      _fill(_c.continueLevel, {'n': n.toString().padLeft(2, '0')});
+  String continueTutorial(int n) =>
+      _fill(_c.continueTutorial, {'n': n.toString().padLeft(2, '0')});
 
   String solvedCount(int cleared, int total) =>
       _fill(_c.solvedCount, {'cleared': '$cleared', 'total': '$total'});
 
   String bestMoves(int n) => _fill(_c.bestMoves, {'n': '$n'});
 
-  String levelNumber(int n) =>
-      _fill(_c.levelNumber, {'n': n.toString().padLeft(2, '0')});
+  String yourBest(int n) => _fill(_c.yourBest, {'n': '$n'});
+
+  String tutorialNumber(int n) =>
+      _fill(_c.tutorialNumber, {'n': n.toString().padLeft(2, '0')});
 
   String hintPaint(String color) => _fill(_c.hintPaint, {'color': color});
 

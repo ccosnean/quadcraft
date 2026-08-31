@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:quadcraft/core/level/endless/endless_levels.dart';
+import 'package:quadcraft/core/level/level.dart';
 import 'package:quadcraft/core/level/levels.dart';
 import 'package:quadcraft/core/shape/shape.dart';
 import 'package:quadcraft/l10n/l10n.dart';
@@ -29,7 +31,7 @@ void main() {
       final l10n = L10n(language);
       expect(l10n.settings, isNotEmpty, reason: language.code);
       expect(l10n.tagline, isNotEmpty, reason: language.code);
-      expect(l10n.continueLevel(7), contains('07'), reason: language.code);
+      expect(l10n.continueTutorial(7), contains('07'), reason: language.code);
       expect(l10n.solvedCount(3, kLevels.length), contains('3'));
       expect(
         l10n.solvedCount(3, kLevels.length),
@@ -43,12 +45,45 @@ void main() {
         isNot(contains('{color}')),
       );
       expect(l10n.thinkYouCanBeat(12), isNot(contains('{moves}')));
+      expect(l10n.sharedLevel, isNotEmpty, reason: language.code);
+      expect(l10n.music, isNotEmpty, reason: language.code);
+      expect(l10n.musicHint, isNotEmpty, reason: language.code);
+      expect(l10n.tutorial, isNotEmpty, reason: language.code);
+      expect(l10n.replayTutorial, isNotEmpty, reason: language.code);
+      expect(l10n.tutorialHint, isNotEmpty, reason: language.code);
+      expect(l10n.copy, isNotEmpty, reason: language.code);
+      expect(l10n.copied, isNotEmpty, reason: language.code);
+      expect(l10n.tutorialNumber(3), contains('03'), reason: language.code);
+      expect(l10n.playShared, isNotEmpty, reason: language.code);
+      expect(l10n.shareCodeHint, isNotEmpty, reason: language.code);
+      expect(l10n.shareCodeBad, isNotEmpty, reason: language.code);
+      expect(l10n.scanToPlay, isNotEmpty, reason: language.code);
+      expect(l10n.beatenIt, isNotEmpty, reason: language.code);
+      expect(l10n.sharedNotCounted, isNotEmpty, reason: language.code);
+      expect(l10n.diveThisSeed, isNotEmpty, reason: language.code);
+      expect(l10n.diveThisSeedBody, isNotEmpty, reason: language.code);
+      expect(l10n.movesToBeat(14), contains('14'), reason: language.code);
+      expect(
+        l10n.movesToBeat(14),
+        isNot(contains('{n}')),
+        reason: language.code,
+      );
       for (final color in QuadColor.values) {
         expect(l10n.colorName(color).trim(), isNotEmpty, reason: language.code);
       }
       if (language != AppLanguage.en) {
         expect(l10n.settings, isNot(const L10n(AppLanguage.en).settings));
         expect(l10n.tagline, isNot(const L10n(AppLanguage.en).tagline));
+        expect(
+          l10n.playShared,
+          isNot(const L10n(AppLanguage.en).playShared),
+          reason: language.code,
+        );
+        expect(
+          l10n.musicHint,
+          isNot(const L10n(AppLanguage.en).musicHint),
+          reason: language.code,
+        );
       }
     }
   });
@@ -84,5 +119,62 @@ void main() {
         isNot(kLevels.first.brief),
       );
     }
+  });
+
+  test('every language names the dive, its bands and every target line', () {
+    for (final language in AppLanguage.values) {
+      final l10n = L10n(language);
+      final code = language.code;
+      expect(l10n.collection, isNotEmpty, reason: code);
+      expect(l10n.seedBody, isNotEmpty, reason: code);
+      expect(l10n.seedDefault, isNotEmpty, reason: code);
+      expect(l10n.seedRandom, isNotEmpty, reason: code);
+      expect(l10n.diveLocked, isNotEmpty, reason: code);
+      expect(l10n.depthLabel(7), contains('07'), reason: code);
+      expect(l10n.builtCount(4), contains('4'), reason: code);
+      expect(l10n.clearedThisRun(9), contains('9'), reason: code);
+      expect(l10n.depthLabel(7), isNot(contains('{n}')), reason: code);
+
+      // Six bands, then the same names with a numeral, forever.
+      expect(l10n.stratumName(0), isNotEmpty, reason: code);
+      final names = {for (var i = 0; i < 6; i++) l10n.stratumName(i)};
+      expect(names.length, 6, reason: code);
+      expect(l10n.stratumName(6), contains(l10n.stratumName(0)), reason: code);
+      expect(l10n.stratumName(6), contains('2'), reason: code);
+
+      for (final theme in LevelTheme.values) {
+        expect(l10n.themeBrief(theme), isNotEmpty, reason: '$code $theme');
+        if (language != AppLanguage.en) {
+          expect(
+            l10n.themeBrief(theme),
+            isNot(EndlessLevels.briefFor(theme)),
+            reason: '$code $theme is still the English line',
+          );
+        }
+      }
+    }
+  });
+
+  test('a generated level titles and describes itself in every language', () {
+    final level = EndlessLevels.levelAt(seed: 4242, depth: 13);
+    for (final language in AppLanguage.values) {
+      final l10n = L10n(language);
+      expect(l10n.levelTitle(level), contains('13'), reason: language.code);
+      expect(
+        l10n.levelSection(level),
+        l10n.stratumName(level.stratum),
+        reason: language.code,
+      );
+      expect(
+        l10n.levelLine(level),
+        l10n.themeBrief(level.theme!),
+        reason: language.code,
+      );
+    }
+    // Campaign levels keep their authored copy.
+    expect(
+      const L10n(AppLanguage.en).levelTitle(kLevels.first),
+      kLevels.first.name,
+    );
   });
 }
