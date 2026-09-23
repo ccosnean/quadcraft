@@ -1,0 +1,51 @@
+name: Windows build
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+    branches: [main]
+    paths: ['windows/**', '.github/workflows/windows.yml']
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.41.6
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - run: flutter build windows --release
+
+      # Flutter's Windows runner links the MSVC runtime dynamically, so a PC
+      # without the VC++ redistributable fails with "VCRUNTIME140.dll was not
+      # found". Shipping the DLLs next to the exe (app-local deployment) fixes it.
+      - name: Bundle MSVC runtime
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          $crt = Get-ChildItem "$vs\VC\Redist\MSVC\*\x64\Microsoft.VC*.CRT" -Directory | Sort-Object FullName -Descending | Select-Object -First 1
+          Write-Host "Using CRT from $($crt.FullName)"
+          $out = "build\windows\x64\runner\Release"
+          foreach ($dll in 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll') {
+            Copy-Item "$($crt.FullName)\$dll" $out
+          }
+          Get-ChildItem $out
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item -Recurse build\windows\x64\runner\Release dist\Quadcraft
+          Compress-Archive -Path dist\Quadcraft -DestinationPath dist\Quadcraft-windows-x64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Quadcraft-windows-x64
+          path: dist/Quadcraft
